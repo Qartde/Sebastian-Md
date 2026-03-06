@@ -34,7 +34,7 @@
     "fs-extra": "^11.2.0",
     "g-i-s": "^2.1.7",
     "gist": "^2.0.0",
-    "genius-lyrics": "^4.4.9",
+    "genius-lyrics": "^4.4.8",
     "google-it": "^1.6.4",
     "google-tts-api": "^1.0.2",
     "heroku-client": "^3.1.1",
