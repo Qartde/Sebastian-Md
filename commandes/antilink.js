@@ -2,7 +2,7 @@
 const zokou = require("../framework/zokou");
 
 zokou({
-    nomCom: "antilink",
+    nomCom: "antilink2",
     categorie: "Admin",
     reaction: "🚫",
     desc: "Manage antilink feature in groups"
