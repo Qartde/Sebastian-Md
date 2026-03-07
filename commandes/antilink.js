@@ -1,7 +1,7 @@
 // commandes/antilink.js
-const evt = require("../framework/zokou");
+const zokou = require("../framework/zokou");
 
-evt({
+zokou({
     nomCom: "antilink",
     categorie: "Admin",
     reaction: "🚫",
@@ -12,8 +12,14 @@ evt({
         superUser, 
         arg, 
         repondre, 
-        origineMessage: groupId 
+        verifGroupe
     } = commandeOptions;
+    
+    // Check if it's a group
+    if (!verifGroupe) {
+        repondre('❌ This command only works in groups!');
+        return;
+    }
     
     // Check if user is admin
     if (!verifAdmin && !superUser) {
@@ -21,55 +27,71 @@ evt({
         return;
     }
     
-    // Check if it's a group
-    if (!groupId.endsWith('@g.us')) {
-        repondre('❌ This command only works in groups!');
-        return;
-    }
-    
-    const { ajouterOuMettreAJourJid, mettreAJourAction } = require('../bdd/antilien');
-    
-    if (!arg || arg.length === 0) {
-        // Show current status
-        const { verifierEtatJid, recupererActionJid } = require('../bdd/antilien');
-        const enabled = await verifierEtatJid(groupId);
-        const action = await recupererActionJid(groupId);
+    try {
+        const { ajouterOuMettreAJourJid, mettreAJourAction, verifierEtatJid, recupererActionJid } = require('../bdd/antilien');
         
-        repondre(`📊 *Antilink Status*\n\n` +
-                 `Status: ${enabled ? '✅ Enabled' : '❌ Disabled'}\n` +
-                 `Action: *${action}*\n\n` +
-                 `Use: .antilink on/off/set`);
-        return;
-    }
-    
-    if (arg[0] === 'on') {
-        // Enable antilink
-        if (arg[1] && ['delete', 'remove', 'warn'].includes(arg[1])) {
-            await mettreAJourAction(groupId, arg[1]);
+        // No arguments - show status
+        if (!arg || arg.length === 0) {
+            const enabled = await verifierEtatJid(origineMessage);
+            const action = await recupererActionJid(origineMessage);
+            
+            repondre(`📊 *ANTILINK STATUS*\n\n` +
+                     `Status: ${enabled ? '✅ ENABLED' : '❌ DISABLED'}\n` +
+                     `Action: *${action}*\n\n` +
+                     `*Commands:*\n` +
+                     `• .antilink on [action]\n` +
+                     `• .antilink off\n` +
+                     `• .antilink set delete\n` +
+                     `• .antilink set remove\n` +
+                     `• .antilink set warn`);
+            return;
         }
-        await ajouterOuMettreAJourJid(groupId, 'oui');
-        repondre('✅ *Antilink Enabled*\n\nLinks will be managed automatically.');
         
-    } else if (arg[0] === 'off') {
-        await ajouterOuMettreAJourJid(groupId, 'non');
-        repondre('❌ *Antilink Disabled*');
-        
-    } else if (arg[0] === 'set' && arg[1]) {
-        const action = arg[1];
-        if (['delete', 'remove', 'warn'].includes(action)) {
-            await mettreAJourAction(groupId, action);
-            repondre(`✅ *Antilink Action Updated*\n\nAction: *${action}*`);
+        // Handle different arguments
+        if (arg[0] === 'on') {
+            // Enable antilink
+            if (arg[1] && ['delete', 'remove', 'warn'].includes(arg[1])) {
+                await mettreAJourAction(origineMessage, arg[1]);
+            }
+            await ajouterOuMettreAJourJid(origineMessage, 'oui');
+            
+            const action = arg[1] || await recupererActionJid(origineMessage);
+            repondre(`✅ *ANTILINK ENABLED*\n\n` +
+                     `Status: ✅ ACTIVE\n` +
+                     `Action: *${action}*\n` +
+                     `Group: Protected\n\n` +
+                     `Links will be managed automatically.`);
+            
+        } else if (arg[0] === 'off') {
+            // Disable antilink
+            await ajouterOuMettreAJourJid(origineMessage, 'non');
+            repondre(`❌ *ANTILINK DISABLED*\n\n` +
+                     `Status: ❌ INACTIVE\n` +
+                     `Group: No longer protected\n\n` +
+                     `Links are now allowed.`);
+            
+        } else if (arg[0] === 'set' && arg[1]) {
+            const action = arg[1];
+            if (['delete', 'remove', 'warn'].includes(action)) {
+                await mettreAJourAction(origineMessage, action);
+                repondre(`✅ *ANTILINK ACTION UPDATED*\n\n` +
+                         `New Action: *${action}*\n` +
+                         `Status: ${action === 'delete' ? '🚫 Delete only' : action === 'remove' ? '👢 Remove user' : '⚠️ Warning system'}`);
+            } else {
+                repondre('❌ Invalid action. Use: delete, remove, or warn');
+            }
+            
         } else {
-            repondre('❌ Invalid action. Use: delete, remove, or warn');
+            repondre(`*ANTILINK COMMANDS*\n\n` +
+                     `.antilink - Show status\n` +
+                     `.antilink on [action] - Enable antilink\n` +
+                     `.antilink off - Disable antilink\n` +
+                     `.antilink set delete - Delete only\n` +
+                     `.antilink set remove - Remove user\n` +
+                     `.antilink set warn - Warn system`);
         }
-        
-    } else {
-        repondre(`*Antilink Commands:*\n\n` +
-                 `.antilink - Show status\n` +
-                 `.antilink on [action] - Enable antilink\n` +
-                 `.antilink off - Disable antilink\n` +
-                 `.antilink set delete - Delete only\n` +
-                 `.antilink set remove - Remove user\n` +
-                 `.antilink set warn - Warn system`);
+    } catch (error) {
+        console.log("Antilink command error:", error);
+        repondre("❌ Error executing command. Check logs.");
     }
 });
