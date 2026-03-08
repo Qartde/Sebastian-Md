@@ -43,7 +43,7 @@ const date = moment().format('DD/MM/YYYY');
  ${message}
  
  
- *KYPHER26*`
+ *𝐊𝐈𝐁𝐎𝐑𝐄*`
 
  if (lien.match(/\.(mp4|gif)$/i)) {
     try {
@@ -71,14 +71,14 @@ else {
 }
 
     } else {
-        if(!superUser) { repondre("*VAR_KITAA IS ALIVE FOR A LIFE TIME*") ; return};
+        if(!superUser) { repondre("𝐊𝐈𝐁𝐎𝐑𝐄") ; return};
 
-      await   repondre("VAR_KITAA IS ALIVE AT THE MOMMENT DEPLOY IT NOW AND ENJOY");
-         repondre("don't do fake thinks :)")
+      await   repondre("*https://whatsapp.com/channel/0029Vb7LxhRGE56l9woRjd2g");
+         repondre("𝗛𝗲𝗹𝗹𝗼 𝗜 𝗮𝗺 𝐒𝐞𝐛𝐚 𝗠𝗱,𝗔𝘃𝗮𝗶𝗹𝗮𝗯𝗹𝗲 𝗙𝗼𝗿 𝘂𝘀𝗲..")
      }
  } else {
 
-    if(!superUser) { repondre ("VAR_KITAA ONLY") ; return};
+    if(!superUser) { repondre ("𝐊𝐈𝐁𝐎𝐑𝐄") ; return};
 
   
     const texte = arg.join(' ').split(';')[0];
@@ -88,8 +88,7 @@ else {
     
 await addOrUpdateDataInAlive(texte , tlien)
 
-repondre('BIG UP MWANAKITAA. ')
+repondre(' https://whatsapp.com/channel/0029Vb7LxhRGE56l9woRjd2g. ')
 
 }
     });
-    

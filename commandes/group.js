@@ -30,13 +30,15 @@ zokou({ nomCom: "tagall", categorie: 'Group', reaction: "📣" }, async (dest, z
   } ;
   let membresGroupe = verifGroupe ? await infosGroupe.participants : ""
   var tag = ""; 
-  tag += `========================\n  
-        🌟 *༺𝐕𝐀𝐑 𝐊𝐈𝐓𝐀𝐀༻* 🌟
-========================\n
-👥 Group : ${nomGroupe} 🚀 
-👤 Autor : *${nomAuteurMessage}* 👋 
-📜 Message : *${mess}* 📝
-========================\n
+  tag +=`
+  
+╭─────────────━┈⊷ 
+│🌟 𝐒𝐄𝐁𝐀  𝐌𝐃 𝐓𝐀𝐆
+╰─────────────━┈⊷ \n
+│👥 *Group* : ${nomGroupe} 
+│👤 *Hey😀* : *${nomAuteurMessage}* 
+│📜 *Message* : *${mess}* 
+╰─────────────━┈⊷\n
 \n
 
 ` ;
@@ -72,7 +74,7 @@ zokou({ nomCom: "link", categorie: 'Group', reaction: "🙋" }, async (dest, zk,
 
   let mess = `hello ${nomAuteurMessage} , here is the group link for ${nomGroupe} \n
 
-Grp link :${lien} \n\n 𝐖𝐀𝐍𝐀𝐊𝐈𝐓𝐀𝐀 𝐅𝐀𝐌𝐈𝐋𝐘`
+Group link :${lien} \n\n©𝐑𝐚𝐡𝐦𝐚𝐧`
   repondre(mess)
 
 
@@ -249,7 +251,7 @@ zokou({ nomCom: "remove", categorie: 'Group', reaction: "👨🏿‍💼" }, asy
         if (zkad) {
           if (membre) {
             if (admin == false) {
-              const gifLink = "https://raw.githubusercontent.com/Mrandbad/ANDBAD-MD-V1/main/andbad/remover.gif"
+              const gifLink = "https://raw.githubusercontent.com/djalega8000/Zokou-MD/main/media/remover.gif"
               var sticker = new Sticker(gifLink, {
                 pack: 'Zokou-Md', // The pack name
                 author: nomAuteurMessage, // The author name
@@ -368,16 +370,16 @@ zokou({ nomCom: "info", categorie: 'Group' }, async (dest, zk, commandeOptions) 
   if( superUser || verifAdmin) {
     const enetatoui = await verifierEtatJid(dest)
     try {
-      if (!arg || !arg[0] || arg === ' ') { repondre("*༺𝐕𝐀𝐑 𝐊𝐈𝐓𝐀𝐀༻*\n\n antilink on to activate the anti-link feature\nantilink off to deactivate the anti-link feature\nantilink action/remove to directly remove the link without notice\nantilink action/warn to give warnings\nantilink action/delete to remove the link without any sanctions\n\nPlease note that by default, the anti-link feature is set to delete.") ; return};
+      if (!arg || !arg[0] || arg === ' ') { repondre("antilink on to activate the anti-link feature\nantilink off to deactivate the anti-link feature\nantilink action/remove to directly remove the link without notice\nantilink action/warn to give warnings\nantilink action/delete to remove the link without any sanctions\n\nPlease note that by default, the anti-link feature is set to delete.") ; return};
      
       if(arg[0] === 'on') {
 
       
-       if(enetatoui ) { repondre("antilink is already activated for this group")
+       if(enetatoui ) { repondre("the antilink is already activated for this group")
                     } else {
                   await ajouterOuMettreAJourJid(dest,"oui");
                 
-              repondre("༺𝐕𝐀𝐑 𝐊𝐈𝐓𝐀𝐀༻ ANTILINK SUCCESSFULLY ACTIVATED") }
+              repondre("the antilink is activated successfully") }
      
             } else if (arg[0] === "off") {
 
@@ -387,7 +389,7 @@ zokou({ nomCom: "info", categorie: 'Group' }, async (dest, zk, commandeOptions) 
                 repondre("The antilink has been successfully deactivated");
                 
               } else {
-                repondre("*༺𝐕𝐀𝐑 𝐊𝐈𝐓𝐀𝐀༻ACTIVATED ANTILINK SUCCESSFULLY*");
+                repondre("antilink is not activated for this group");
               }
             } else if (arg.join('').split("/")[0] === 'action') {
                             
@@ -441,7 +443,7 @@ zokou({ nomCom: "info", categorie: 'Group' }, async (dest, zk, commandeOptions) 
       if(arg[0] === 'on') {
 
       
-       if(enetatoui ) { repondre("༺𝐕𝐀𝐑 𝐊𝐈𝐓𝐀𝐀༻...the antibot is already activated for this group")
+       if(enetatoui ) { repondre("the antibot is already activated for this group")
                     } else {
                   await atbajouterOuMettreAJourJid(dest,"oui");
                 
@@ -660,7 +662,7 @@ zokou({nomCom:"hidetag",categorie:'Group',reaction:"🎤"},async(dest,zk,command
         let media  = await zk.downloadAndSaveMediaMessage(msgRepondu.stickerMessage)
 
         let stickerMess = new Sticker(media, {
-          pack: 'Bmw-mdtag',
+          pack: 'Kibore-mdtag',
           type: StickerTypes.CROPPED,
           categories: ["🤩", "🎉"],
           id: "12345",
@@ -726,7 +728,7 @@ zokou({ nomCom: "apk", reaction: "✨", categorie: "Recherche" }, async (dest, z
 
     const downloadLink = appData.dllink;
     const captionText =
-      "『 *༺𝐕𝐀𝐑 𝐊𝐈𝐓𝐀𝐀༻ application* 』\n\n*Name :* " + appData.name +
+      "『 *Kibore-Md Application* 』\n\n*Name :* " + appData.name +
       "\n*Id :* " + appData["package"] +
       "\n*Last Update :* " + appData.lastup +
       "\n*Size :* " + appData.size +

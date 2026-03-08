@@ -8,7 +8,7 @@ const s = require(__dirname + "/../set");
 const more = String.fromCharCode(8206)
 const readmore = more.repeat(4001)
 
-zokou({ nomCom: "git", categorie: "General" }, async (dest, zk, commandeOptions) => {
+zokou({ nomCom: "repo", categorie: "General" }, async (dest, zk, commandeOptions) => {
     let { ms, repondre ,prefixe,nomAuteurMessage,mybotpic} = commandeOptions;
     let { cm } = require(__dirname + "/../framework//zokou");
     var coms = {};
@@ -34,38 +34,26 @@ const temps = moment().format('HH:mm:ss');
 const date = moment().format('DD/MM/YYYY');
 
   let infoMsg =  `
-╔════════════════╗  
-  🌟*REPOS & GROUPS* 🌟 
-╚════════════════╝  
-  
-📢 *CHANNEL*  
-➤https://whatsapp.com/channel/0029VasLXWp4tRs0xU9MDc47  
-  
-👥 *GROUP*  
-➤ https://chat.whatsapp.com/DTnrZzULVtP5r0E9rhoFOj  
-  
-💻 *REPO*  
-➤https://github.com/Raphaaaaa05/VAR_KITAA
-  
-▶️ *YOUTUBE*  
-➤𝐒𝐎𝐎𝐍 𝐀𝐒 𝐏𝐎𝐒𝐈𝐁𝐋𝐄
-  
-═══════════════════════  
-🎨 *DESIGNED BY*  
-𝐌𝐑 𝐍𝐎𝐁𝐎𝐃𝐘
-═══════════════════════  
-  
-🔔 *Stay Connected!*  
-💬 _Join us for updates and exclusive content._  
-  
-🔥 *DON’T FORGET TO:*  
-➤ Star the repo ⭐  
-➤ FOLLOW WAchannel 🔔  
-➤ Share with friends \n
+*AVAILABLE REPO AND GROUPS* 
+╭─────────────────
+│❒⁠⁠⁠⁠╭─────────────
+│❒⁠⁠⁠⁠│▸ *CHANNEL1* 
+│❒⁠⁠⁠⁠│▸ *GROUP* 
+│❒⁠⁠⁠⁠│▸ *REPO*
+│❒⁠⁠⁠⁠╰──────────────
+│❒⁠⁠⁠⁠│▸ *CHANNEL* :  https://whatsapp.com/channel/0029Vb7LxhRGE56l9woRjd2g
+
+│❒⁠⁠⁠⁠│▸ *GROUP* : https://chat.whatsapp.com/DTnrZzULVtP5r0E9rhoFOj
+
+│❒⁠⁠⁠⁠│▸ *REPO* : https://github.com/bravesebastian458-dotcom/Sebastian-Md
+
+│❒⁠⁠⁠⁠│▸ *CHANNEL2* https://whatsapp.com/channel/0029Vb7LxhRGE56l9woRjd2g
+│❒⁠⁠⁠⁠╰──────────────
+╰──────────────────\n
   `;
     
 let menuMsg = `
-     CREATED BY 𝐌𝐑 𝐍𝐎𝐁𝐎𝐃𝐘
+     *MADE EASY BY SEBASTIAN*
 
 ❒────────────────────❒`;
 
