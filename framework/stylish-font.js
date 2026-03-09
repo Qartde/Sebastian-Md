@@ -1,9 +1,4 @@
-
-
-
-
-
-// Credits to Neeraj-X0
+ // Credits to Neeraj-X0
 const unicode = require("./unicode");
 var style = unicode;
 style.tools.creepify.options.maxHeight = 10;
