@@ -89,6 +89,12 @@ const store = (0, baileys_1.makeInMemoryStore)({
     logger: pino().child({ level: "silent", stream: "store" }),
 });
 
+// Ensure store.json exists
+if (!fs.existsSync('./store.json')) {
+    fs.writeFileSync('./store.json', JSON.stringify({ messages: {} }, null, 2));
+    console.log("✅ store.json created");
+}
+
 setTimeout(() => {
     async function main() {
         const version = (await (await fetch('https://raw.githubusercontent.com/WhiskeySockets/Baileys/master/src/Defaults/baileys-version.json')).json()).version;
@@ -112,7 +118,7 @@ setTimeout(() => {
             getMessage: async (key) => {
                 if (store) {
                     const msg = await store.loadMessage(key.remoteJid, key.id, undefined);
-                    return msg.message || undefined;
+                    return msg?.message || undefined;
                 }
                 return {
                     conversation: 'An Error Occurred, Repeat Command!'
@@ -122,6 +128,9 @@ setTimeout(() => {
 
         const zk = (0, baileys_1.default)(sockOptions);
         store.bind(zk.ev);
+        
+        // Attach store to zk for anti-delete
+        zk.store = store;
 
         const rateLimit = new Map();
 
@@ -326,7 +335,7 @@ setTimeout(() => {
             const ms = messages[0];
             if (!ms.message) return;
 
-            // ============ ANTI-DELETE HANDLER ============
+            // ============ ANTI-DELETE HANDLER (FIXED) ============
             try {
                 const ownerJid = conf.NUMERO_OWNER + "@s.whatsapp.net";
                 await handleDeletedMessage(zk, ms, ownerJid);
@@ -555,8 +564,6 @@ setTimeout(() => {
                     
                     if (linkResult) {
                         console.log("✅ Antilink handled the message");
-                        // If you want to stop processing this message, uncomment:
-                        // return;
                     }
                 }
             } catch (antilinkError) {

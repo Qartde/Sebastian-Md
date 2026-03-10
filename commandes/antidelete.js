@@ -110,32 +110,93 @@ async function downloadMedia(zk, message, type) {
     }
 }
 
-// Function to get deleted message from store
+// Function to get deleted message from store with multiple methods
 async function getDeletedMessageFromStore(zk, chatJid, messageId) {
+    const methods = [];
+    
+    // METHOD 1: Try zk.store directly
     try {
-        // Try store.loadMessage
-        if (zk.store && typeof zk.store.loadMessage === 'function') {
-            const msg = await zk.store.loadMessage(chatJid, messageId);
-            if (msg) return msg;
+        if (zk.store) {
+            if (typeof zk.store.loadMessage === 'function') {
+                const msg = await zk.store.loadMessage(chatJid, messageId);
+                if (msg) {
+                    console.log("✅ Found via zk.store.loadMessage");
+                    return msg;
+                }
+            }
+            
+            if (zk.store.messages && zk.store.messages[chatJid]) {
+                const msg = zk.store.messages[chatJid].find(m => m.key.id === messageId);
+                if (msg) {
+                    console.log("✅ Found via zk.store.messages");
+                    return msg;
+                }
+            }
         }
-        
-        // Try store.json file
+    } catch (e) {
+        methods.push(`Method 1 failed: ${e.message}`);
+    }
+    
+    // METHOD 2: Try global.store
+    try {
+        if (global.store) {
+            if (global.store.messages && global.store.messages[chatJid]) {
+                const msg = global.store.messages[chatJid].find(m => m.key.id === messageId);
+                if (msg) {
+                    console.log("✅ Found via global.store");
+                    return msg;
+                }
+            }
+        }
+    } catch (e) {
+        methods.push(`Method 2 failed: ${e.message}`);
+    }
+    
+    // METHOD 3: Try reading store.json file
+    try {
         const storePath = './store.json';
         if (fs.existsSync(storePath)) {
             const storeData = fs.readFileSync(storePath, 'utf8');
             const jsonData = JSON.parse(storeData);
             
+            // Try different structures
             if (jsonData.messages && jsonData.messages[chatJid]) {
-                const messages = jsonData.messages[chatJid];
-                return messages.find(msg => msg.key.id === messageId);
+                const msg = jsonData.messages[chatJid].find(m => m.key.id === messageId);
+                if (msg) {
+                    console.log("✅ Found via store.json messages");
+                    return msg;
+                }
+            }
+            
+            if (jsonData[chatJid]) {
+                const msg = jsonData[chatJid].find(m => m.key.id === messageId);
+                if (msg) {
+                    console.log("✅ Found via store.json direct");
+                    return msg;
+                }
             }
         }
-        
-        return null;
-    } catch (error) {
-        console.log("Error getting deleted message:", error.message);
-        return null;
+    } catch (e) {
+        methods.push(`Method 3 failed: ${e.message}`);
     }
+    
+    // METHOD 4: Try to get from message history
+    try {
+        // Try to get recent messages from the chat
+        const recentMessages = await zk.loadMessages(chatJid, 50);
+        if (recentMessages && recentMessages.length > 0) {
+            const msg = recentMessages.find(m => m.key.id === messageId);
+            if (msg) {
+                console.log("✅ Found via loadMessages");
+                return msg;
+            }
+        }
+    } catch (e) {
+        methods.push(`Method 4 failed: ${e.message}`);
+    }
+    
+    console.log("❌ All methods failed to find message:", methods);
+    return null;
 }
 
 // Export the anti-delete handler
@@ -179,114 +240,102 @@ module.exports = {
                 } catch (e) {}
             }
             
+            console.log(`🔍 Looking for message ID: ${messageId} in ${chatJid}`);
+            
             // Try to get the deleted message from store
             const deletedMessage = await getDeletedMessageFromStore(zk, chatJid, messageId);
             
-            let messageType = "UNKNOWN";
-            let messageContent = "";
-            let mediaBuffer = null;
-            
-            // If found in store, extract content
             if (deletedMessage && deletedMessage.message) {
                 const msg = deletedMessage.message;
+                console.log("✅ Message found! Type:", Object.keys(msg));
                 
                 if (msg.conversation) {
-                    messageType = "TEXT";
-                    messageContent = msg.conversation;
-                    
-                    // Send TEXT directly to owner
+                    // TEXT MESSAGE
                     await zk.sendMessage(ownerJid, {
-                        text: `📝 *Deleted Text:*\n\n${messageContent}\n\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}`
+                        text: `📝 *Deleted Text*\n\n${msg.conversation}\n\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}`
                     });
-                    
-                } 
+                    console.log("✅ Deleted text forwarded");
+                }
                 else if (msg.extendedTextMessage?.text) {
-                    messageType = "TEXT";
-                    messageContent = msg.extendedTextMessage.text;
-                    
-                    // Send TEXT directly to owner
+                    // EXTENDED TEXT
                     await zk.sendMessage(ownerJid, {
-                        text: `📝 *Deleted Text:*\n\n${messageContent}\n\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}`
+                        text: `📝 *Deleted Text*\n\n${msg.extendedTextMessage.text}\n\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}`
                     });
+                    console.log("✅ Deleted extended text forwarded");
                 }
                 else if (msg.imageMessage) {
-                    messageType = "IMAGE";
-                    messageContent = msg.imageMessage.caption || "";
-                    mediaBuffer = await downloadMedia(zk, msg.imageMessage, 'image');
-                    
-                    if (mediaBuffer) {
-                        await zk.sendMessage(ownerJid, {
-                            image: mediaBuffer,
-                            caption: `🖼️ *Deleted Image*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}\n📝 *Caption:* ${messageContent}`
-                        });
+                    // IMAGE
+                    try {
+                        const buffer = await downloadMedia(zk, msg.imageMessage, 'image');
+                        if (buffer) {
+                            await zk.sendMessage(ownerJid, {
+                                image: buffer,
+                                caption: `🖼️ *Deleted Image*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}\n📝 *Caption:* ${msg.imageMessage.caption || ''}`
+                            });
+                            console.log("✅ Deleted image forwarded");
+                        }
+                    } catch (e) {
+                        console.log("Failed to download image:", e);
                     }
                 }
                 else if (msg.videoMessage) {
-                    messageType = "VIDEO";
-                    messageContent = msg.videoMessage.caption || "";
-                    mediaBuffer = await downloadMedia(zk, msg.videoMessage, 'video');
-                    
-                    if (mediaBuffer) {
-                        await zk.sendMessage(ownerJid, {
-                            video: mediaBuffer,
-                            caption: `🎥 *Deleted Video*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}\n📝 *Caption:* ${messageContent}`
-                        });
+                    // VIDEO
+                    try {
+                        const buffer = await downloadMedia(zk, msg.videoMessage, 'video');
+                        if (buffer) {
+                            await zk.sendMessage(ownerJid, {
+                                video: buffer,
+                                caption: `🎥 *Deleted Video*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}\n📝 *Caption:* ${msg.videoMessage.caption || ''}`
+                            });
+                            console.log("✅ Deleted video forwarded");
+                        }
+                    } catch (e) {
+                        console.log("Failed to download video:", e);
                     }
                 }
                 else if (msg.stickerMessage) {
-                    messageType = "STICKER";
-                    mediaBuffer = await downloadMedia(zk, msg.stickerMessage, 'sticker');
-                    
-                    if (mediaBuffer) {
-                        await zk.sendMessage(ownerJid, {
-                            sticker: mediaBuffer
-                        });
-                        // Send info separately
-                        await zk.sendMessage(ownerJid, {
-                            text: `🖼️ *Deleted Sticker*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}`
-                        });
+                    // STICKER
+                    try {
+                        const buffer = await downloadMedia(zk, msg.stickerMessage, 'sticker');
+                        if (buffer) {
+                            await zk.sendMessage(ownerJid, { sticker: buffer });
+                            await zk.sendMessage(ownerJid, {
+                                text: `🖼️ *Deleted Sticker*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}`
+                            });
+                            console.log("✅ Deleted sticker forwarded");
+                        }
+                    } catch (e) {
+                        console.log("Failed to download sticker:", e);
                     }
                 }
                 else if (msg.audioMessage) {
-                    messageType = "AUDIO";
-                    mediaBuffer = await downloadMedia(zk, msg.audioMessage, 'audio');
-                    
-                    if (mediaBuffer) {
-                        await zk.sendMessage(ownerJid, {
-                            audio: mediaBuffer,
-                            mimetype: 'audio/mp4',
-                            caption: `🎵 *Deleted Audio*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}`
-                        });
-                    }
-                }
-                else if (msg.documentMessage) {
-                    messageType = "DOCUMENT";
-                    messageContent = msg.documentMessage.fileName || "";
-                    mediaBuffer = await downloadMedia(zk, msg.documentMessage, 'document');
-                    
-                    if (mediaBuffer) {
-                        await zk.sendMessage(ownerJid, {
-                            document: mediaBuffer,
-                            fileName: messageContent,
-                            caption: `📄 *Deleted Document*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}`
-                        });
+                    // AUDIO
+                    try {
+                        const buffer = await downloadMedia(zk, msg.audioMessage, 'audio');
+                        if (buffer) {
+                            await zk.sendMessage(ownerJid, {
+                                audio: buffer,
+                                mimetype: 'audio/mp4',
+                                caption: `🎵 *Deleted Audio*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}`
+                            });
+                            console.log("✅ Deleted audio forwarded");
+                        }
+                    } catch (e) {
+                        console.log("Failed to download audio:", e);
                     }
                 }
                 else {
-                    // Unknown type - try to get raw
-                    messageType = Object.keys(msg)[0] || "UNKNOWN";
+                    // UNKNOWN TYPE
                     await zk.sendMessage(ownerJid, {
-                        text: `❓ *Deleted ${messageType}*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}\n\n*Message ID:* ${messageId}`
+                        text: `❓ *Deleted ${Object.keys(msg)[0] || 'Unknown'}*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}\n\n*Message ID:* ${messageId}`
                     });
                 }
-                
-                console.log(`✅ Deleted ${messageType} forwarded to owner`);
-                
             } else {
-                // Message not found in store
-                console.log("⚠️ Could not retrieve deleted message from store");
+                console.log("❌ Message not found in store");
+                
+                // Send notification that message couldn't be retrieved
                 await zk.sendMessage(ownerJid, {
-                    text: `❌ *Could not retrieve deleted message*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}\n🆔 *Message ID:* ${messageId}\n\n*Message may be too old or store unavailable.*`
+                    text: `❌ *Could not retrieve deleted message*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}\n🆔 *Message ID:* ${messageId}\n\n*Try forwarding the message before deletion next time.*`
                 });
             }
             
