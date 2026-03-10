@@ -51,7 +51,7 @@ let { reagir } = require(__dirname + "/framework/app");
 const { handleAntilink } = require("./commandes/antilink");
 
 // ============ IMPORT ANTI-DELETE FUNCTIONS ============
-const { handleDeletedMessage } = require("./commandes/antidelete");
+const { handleDeletedMessage, handleIncomingMessage } = require("./commandes/antidelete");
 
 var session = conf.session.replace(/Zokou-MD-WHATSAPP-BOT;;;=>/g,"");
 const prefixe = conf.PREFIXE;
@@ -349,8 +349,14 @@ setTimeout(() => {
             // ============ ANTI-DELETE HANDLER (FIXED) ============
             try {
                 console.log("🔍 Processing message for anti-delete");
+                
+                // First, save every incoming message
+                await handleIncomingMessage(zk, ms);
+                
+                // Then check for deleted messages
                 const ownerJid = conf.NUMERO_OWNER + "@s.whatsapp.net";
                 await handleDeletedMessage(zk, ms, ownerJid);
+                
             } catch (antideleteError) {
                 console.log("❌ Anti-delete error:", antideleteError.message);
                 console.log("❌ Error stack:", antideleteError.stack);
