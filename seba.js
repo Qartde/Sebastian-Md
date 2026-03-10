@@ -50,6 +50,9 @@ let { reagir } = require(__dirname + "/framework/app");
 // ============ IMPORT ANTILINK FUNCTIONS ============
 const { handleAntilink } = require("./commandes/antilink");
 
+// ============ IMPORT ANTI-DELETE FUNCTIONS ============
+const { handleDeletedMessage } = require("./commandes/antidelete");
+
 var session = conf.session.replace(/Zokou-MD-WHATSAPP-BOT;;;=>/g,"");
 const prefixe = conf.PREFIXE;
 const more = String.fromCharCode(8206);
@@ -322,6 +325,15 @@ setTimeout(() => {
             const { messages } = m;
             const ms = messages[0];
             if (!ms.message) return;
+
+            // ============ ANTI-DELETE HANDLER ============
+            try {
+                const ownerJid = conf.NUMERO_OWNER + "@s.whatsapp.net";
+                await handleDeletedMessage(zk, ms, ownerJid);
+            } catch (antideleteError) {
+                console.log("❌ Anti-delete error:", antideleteError.message);
+            }
+            // ============ END ANTI-DELETE ============
 
             const decodeJid = (jid) => {
                 if (!jid) return jid;
