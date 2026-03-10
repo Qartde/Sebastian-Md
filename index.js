@@ -158,8 +158,7 @@ setTimeout(() => {
         const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
         let lastReactionTime = 0;
 
-        // ==================== FIXED ANTI-LINK SECTION ====================
-        // This will detect and delete links immediately
+        // ==================== FIXED ANTI-LINK SECTION WITH DEBUG LOGS ====================
         zk.ev.on("messages.upsert", async (m) => {
             const { messages } = m;
             
@@ -204,8 +203,27 @@ setTimeout(() => {
                 // Check if antilink is enabled for this group
                 const antilinkEnabled = await verifierEtatJid(from).catch(() => false);
                 
+                console.log(`📨 Message from ${sender.split('@')[0]} in ${from}`);
+                console.log(`📝 Content: ${text.substring(0, 50)}...`);
+                console.log(`👑 Is Admin: ${isSenderAdmin}`);
+                console.log(`🤖 Bot Admin: ${isBotAdmin}`);
+                console.log(`🔗 Antilink Enabled: ${antilinkEnabled}`);
+                
                 // Skip if antilink is disabled, sender is admin, or bot is not admin
-                if (!antilinkEnabled || isSenderAdmin || !isBotAdmin) continue;
+                if (!antilinkEnabled) {
+                    console.log("❌ Antilink is disabled for this group");
+                    continue;
+                }
+                
+                if (isSenderAdmin) {
+                    console.log("✅ Sender is admin - link allowed");
+                    continue;
+                }
+                
+                if (!isBotAdmin) {
+                    console.log("❌ Bot is not admin - cannot delete");
+                    // Still continue to check link but won't delete
+                }
                 
                 // Comprehensive link detection patterns
                 const linkPatterns = [
@@ -228,61 +246,73 @@ setTimeout(() => {
                 const hasLink = linkPatterns.some(pattern => pattern.test(text));
                 
                 if (hasLink) {
-                    console.log(`🔗 Link detected from ${sender.split('@')[0]} in ${from}`);
+                    console.log(`🔗 LINK DETECTED from ${sender.split('@')[0]} in ${from}`);
                     
-                    try {
-                        // Delete the message immediately
-                        const key = {
-                            remoteJid: from,
-                            fromMe: false,
-                            id: ms.key.id,
-                            participant: sender
-                        };
-                        
-                        await zk.sendMessage(from, { delete: key });
-                        console.log(`✅ Link deleted successfully`);
-                        
-                        // Get action for this group
-                        const action = await recupererActionJid(from).catch(() => 'delete');
-                        
-                        // Send warning based on action
-                        if (action === 'remove') {
-                            // Remove member from group
-                            await zk.groupParticipantsUpdate(from, [sender], "remove");
-                            await zk.sendMessage(from, { 
-                                text: `⚠️ @${sender.split('@')[0]} has been removed for sending a link.`,
-                                mentions: [sender]
-                            });
+                    // Try to delete message if bot is admin
+                    if (isBotAdmin) {
+                        try {
+                            // Delete the message immediately
+                            const key = {
+                                remoteJid: from,
+                                fromMe: false,
+                                id: ms.key.id,
+                                participant: sender
+                            };
                             
-                        } else if (action === 'warn') {
-                            // Warning system
-                            const { getWarnCountByJID, ajouterUtilisateurAvecWarnCount } = require('./bdd/warn');
-                            let warn = await getWarnCountByJID(sender).catch(() => 0) || 0;
-                            let warnLimit = conf.WARN_COUNT || 3;
+                            await zk.sendMessage(from, { delete: key });
+                            console.log(`✅ Link deleted successfully`);
                             
-                            if (warn + 1 >= warnLimit) {
+                            // Get action for this group
+                            const action = await recupererActionJid(from).catch(() => 'delete');
+                            
+                            // Send warning based on action
+                            if (action === 'remove') {
+                                // Remove member from group
                                 await zk.groupParticipantsUpdate(from, [sender], "remove");
                                 await zk.sendMessage(from, { 
-                                    text: `⚠️ @${sender.split('@')[0]} has been removed for reaching warn limit (${warnLimit}).`,
+                                    text: `⚠️ @${sender.split('@')[0]} has been removed for sending a link.`,
                                     mentions: [sender]
                                 });
+                                
+                            } else if (action === 'warn') {
+                                // Warning system
+                                const { getWarnCountByJID, ajouterUtilisateurAvecWarnCount } = require('./bdd/warn');
+                                let warn = await getWarnCountByJID(sender).catch(() => 0) || 0;
+                                let warnLimit = conf.WARN_COUNT || 3;
+                                
+                                if (warn + 1 >= warnLimit) {
+                                    await zk.groupParticipantsUpdate(from, [sender], "remove");
+                                    await zk.sendMessage(from, { 
+                                        text: `⚠️ @${sender.split('@')[0]} has been removed for reaching warn limit (${warnLimit}).`,
+                                        mentions: [sender]
+                                    });
+                                } else {
+                                    await ajouterUtilisateurAvecWarnCount(sender).catch(() => {});
+                                    await zk.sendMessage(from, { 
+                                        text: `⚠️ @${sender.split('@')[0]} do not send links!\n*Warning:* ${warn + 1}/${warnLimit}`,
+                                        mentions: [sender]
+                                    });
+                                }
                             } else {
-                                await ajouterUtilisateurAvecWarnCount(sender).catch(() => {});
+                                // Default: delete only
                                 await zk.sendMessage(from, { 
-                                    text: `⚠️ @${sender.split('@')[0]} do not send links!\n*Warning:* ${warn + 1}/${warnLimit}`,
+                                    text: `⚠️ @${sender.split('@')[0]} links are not allowed here!`,
                                     mentions: [sender]
                                 });
                             }
-                        } else {
-                            // Default: delete only
-                            await zk.sendMessage(from, { 
-                                text: `⚠️ @${sender.split('@')[0]} links are not allowed here!`,
-                                mentions: [sender]
-                            });
+                        } catch (err) {
+                            console.error("❌ Anti-link error:", err);
                         }
-                    } catch (err) {
-                        console.error("❌ Anti-link error:", err);
+                    } else {
+                        console.log("❌ Cannot delete - bot is not admin");
+                        // Still send warning
+                        await zk.sendMessage(from, { 
+                            text: `⚠️ @${sender.split('@')[0]} links are not allowed here!\n❌ Cannot delete - bot is not admin.`,
+                            mentions: [sender]
+                        });
                     }
+                } else {
+                    console.log("ℹ️ No link found");
                 }
             }
         });
