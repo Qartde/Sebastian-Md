@@ -34,9 +34,8 @@ zokou({
     desc: "Enable or disable anti-delete (forward deleted messages to owner)",
     fromMe: true
 }, async (dest, zk, commandeOptions) => {
-    const { repondre, arg, verifAdmin, superUser } = commandeOptions;
+    const { repondre, arg, superUser } = commandeOptions;
 
-    // Only owner or sudo can use this command
     if (!superUser) {
         return repondre("❌ *Only owner can use this command!*");
     }
@@ -62,7 +61,7 @@ _Powered by Sebastian_`);
         if (status === "on") {
             await repondre(`✅ *ANTI-DELETE ENABLED*
 
-All deleted messages will be forwarded to your DM.
+Deleted messages will be sent to your DM.
 
 📢 *JOIN OUR CHANNEL*
 🔗 ${channelUrl}
@@ -111,6 +110,34 @@ async function downloadMedia(zk, message, type) {
     }
 }
 
+// Function to get deleted message from store
+async function getDeletedMessageFromStore(zk, chatJid, messageId) {
+    try {
+        // Try store.loadMessage
+        if (zk.store && typeof zk.store.loadMessage === 'function') {
+            const msg = await zk.store.loadMessage(chatJid, messageId);
+            if (msg) return msg;
+        }
+        
+        // Try store.json file
+        const storePath = './store.json';
+        if (fs.existsSync(storePath)) {
+            const storeData = fs.readFileSync(storePath, 'utf8');
+            const jsonData = JSON.parse(storeData);
+            
+            if (jsonData.messages && jsonData.messages[chatJid]) {
+                const messages = jsonData.messages[chatJid];
+                return messages.find(msg => msg.key.id === messageId);
+            }
+        }
+        
+        return null;
+    } catch (error) {
+        console.log("Error getting deleted message:", error.message);
+        return null;
+    }
+}
+
 // Export the anti-delete handler
 module.exports = {
     isAntiDeleteOn,
@@ -153,127 +180,114 @@ module.exports = {
             }
             
             // Try to get the deleted message from store
-            let deletedMessage = null;
-            let messageType = "unknown";
+            const deletedMessage = await getDeletedMessageFromStore(zk, chatJid, messageId);
+            
+            let messageType = "UNKNOWN";
             let messageContent = "";
             let mediaBuffer = null;
-            
-            try {
-                // Try to load from store.json
-                const storePath = './store.json';
-                if (fs.existsSync(storePath)) {
-                    const storeData = fs.readFileSync(storePath, 'utf8');
-                    const jsonData = JSON.parse(storeData);
-                    
-                    if (jsonData.messages && jsonData.messages[chatJid]) {
-                        const messages = jsonData.messages[chatJid];
-                        deletedMessage = messages.find(msg => msg.key.id === messageId);
-                    }
-                }
-            } catch (storeError) {
-                console.log("Error reading store:", storeError.message);
-            }
             
             // If found in store, extract content
             if (deletedMessage && deletedMessage.message) {
                 const msg = deletedMessage.message;
                 
                 if (msg.conversation) {
-                    messageType = "text";
+                    messageType = "TEXT";
                     messageContent = msg.conversation;
+                    
+                    // Send TEXT directly to owner
+                    await zk.sendMessage(ownerJid, {
+                        text: `📝 *Deleted Text:*\n\n${messageContent}\n\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}`
+                    });
+                    
                 } 
                 else if (msg.extendedTextMessage?.text) {
-                    messageType = "text";
+                    messageType = "TEXT";
                     messageContent = msg.extendedTextMessage.text;
+                    
+                    // Send TEXT directly to owner
+                    await zk.sendMessage(ownerJid, {
+                        text: `📝 *Deleted Text:*\n\n${messageContent}\n\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}`
+                    });
                 }
                 else if (msg.imageMessage) {
-                    messageType = "image";
+                    messageType = "IMAGE";
                     messageContent = msg.imageMessage.caption || "";
                     mediaBuffer = await downloadMedia(zk, msg.imageMessage, 'image');
+                    
+                    if (mediaBuffer) {
+                        await zk.sendMessage(ownerJid, {
+                            image: mediaBuffer,
+                            caption: `🖼️ *Deleted Image*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}\n📝 *Caption:* ${messageContent}`
+                        });
+                    }
                 }
                 else if (msg.videoMessage) {
-                    messageType = "video";
+                    messageType = "VIDEO";
                     messageContent = msg.videoMessage.caption || "";
                     mediaBuffer = await downloadMedia(zk, msg.videoMessage, 'video');
+                    
+                    if (mediaBuffer) {
+                        await zk.sendMessage(ownerJid, {
+                            video: mediaBuffer,
+                            caption: `🎥 *Deleted Video*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}\n📝 *Caption:* ${messageContent}`
+                        });
+                    }
                 }
                 else if (msg.stickerMessage) {
-                    messageType = "sticker";
+                    messageType = "STICKER";
                     mediaBuffer = await downloadMedia(zk, msg.stickerMessage, 'sticker');
-                }
-                else if (msg.audioMessage) {
-                    messageType = "audio";
-                    mediaBuffer = await downloadMedia(zk, msg.audioMessage, 'audio');
-                }
-                else if (msg.documentMessage) {
-                    messageType = "document";
-                    messageContent = msg.documentMessage.fileName || "";
-                }
-            }
-            
-            const channelUrl = "https://whatsapp.com/channel/0029Vb7LxhRGE56l9woRjd2g";
-            
-            // Prepare caption for owner
-            let caption = `╭━━━ *『 DELETED MESSAGE 』* ━━━╮
-┃
-┃ 👤 *Sender:* ${senderNumber}
-┃ 💬 *Chat:* ${chatName}
-┃ 📌 *Type:* ${messageType.toUpperCase()}
-┃ 🕐 *Time:* ${new Date().toLocaleString()}
-┃
-`;
-
-            if (messageContent) {
-                caption += `┃ 📝 *Content:*\n┃ ${messageContent}\n┃\n`;
-            }
-            
-            caption += `╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯
-
-📢 *JOIN OUR CHANNEL*
-🔗 ${channelUrl}
-
-_Powered by Sebastian_`;
-            
-            // Send to owner
-            if (ownerJid) {
-                if (mediaBuffer && (messageType === 'image' || messageType === 'video' || messageType === 'sticker' || messageType === 'audio')) {
-                    // Send with media
-                    let mediaMessage = {};
                     
-                    if (messageType === 'image') {
-                        mediaMessage = { 
-                            image: mediaBuffer,
-                            caption: caption
-                        };
-                    } else if (messageType === 'video') {
-                        mediaMessage = { 
-                            video: mediaBuffer,
-                            caption: caption
-                        };
-                    } else if (messageType === 'sticker') {
-                        // Send sticker first
-                        await zk.sendMessage(ownerJid, { 
+                    if (mediaBuffer) {
+                        await zk.sendMessage(ownerJid, {
                             sticker: mediaBuffer
                         });
-                        // Then send caption separately
-                        await zk.sendMessage(ownerJid, { text: caption });
-                        return;
-                    } else if (messageType === 'audio') {
-                        mediaMessage = { 
+                        // Send info separately
+                        await zk.sendMessage(ownerJid, {
+                            text: `🖼️ *Deleted Sticker*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}`
+                        });
+                    }
+                }
+                else if (msg.audioMessage) {
+                    messageType = "AUDIO";
+                    mediaBuffer = await downloadMedia(zk, msg.audioMessage, 'audio');
+                    
+                    if (mediaBuffer) {
+                        await zk.sendMessage(ownerJid, {
                             audio: mediaBuffer,
                             mimetype: 'audio/mp4',
-                            caption: caption
-                        };
+                            caption: `🎵 *Deleted Audio*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}`
+                        });
                     }
+                }
+                else if (msg.documentMessage) {
+                    messageType = "DOCUMENT";
+                    messageContent = msg.documentMessage.fileName || "";
+                    mediaBuffer = await downloadMedia(zk, msg.documentMessage, 'document');
                     
-                    if (Object.keys(mediaMessage).length > 0) {
-                        await zk.sendMessage(ownerJid, mediaMessage);
+                    if (mediaBuffer) {
+                        await zk.sendMessage(ownerJid, {
+                            document: mediaBuffer,
+                            fileName: messageContent,
+                            caption: `📄 *Deleted Document*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}`
+                        });
                     }
-                } else {
-                    // Send as text
-                    await zk.sendMessage(ownerJid, { text: caption });
+                }
+                else {
+                    // Unknown type - try to get raw
+                    messageType = Object.keys(msg)[0] || "UNKNOWN";
+                    await zk.sendMessage(ownerJid, {
+                        text: `❓ *Deleted ${messageType}*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}\n\n*Message ID:* ${messageId}`
+                    });
                 }
                 
                 console.log(`✅ Deleted ${messageType} forwarded to owner`);
+                
+            } else {
+                // Message not found in store
+                console.log("⚠️ Could not retrieve deleted message from store");
+                await zk.sendMessage(ownerJid, {
+                    text: `❌ *Could not retrieve deleted message*\n👤 *From:* ${senderNumber}\n💬 *Chat:* ${chatName}\n🆔 *Message ID:* ${messageId}\n\n*Message may be too old or store unavailable.*`
+                });
             }
             
         } catch (error) {
