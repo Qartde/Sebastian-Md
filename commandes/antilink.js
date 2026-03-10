@@ -123,7 +123,7 @@ zokou({
             ".antilink warncount [number] - Set warn count\n" +
             ".antilink resetwarn @user - Reset warns\n" +
             ".antilink status - Check status\n\n" +
-            "_Powered by Rahmany_");
+            "_Powered by Sebastian_");
     }
 
     if (arg[0].toLowerCase() === "status") {
@@ -132,8 +132,7 @@ zokou({
             `Status: ${config.status === 'on' ? '✅ ON' : '❌ OFF'}\n` +
             `Action: ${config.action.toUpperCase()}\n` +
             `Warn Count: ${config.warnCount}\n\n` +
-            `Bot Admin: ${verifAdmin ? '✅' : '❌'}\n\n` +
-            `_Powered by Rahmany_`);
+            `_Powered by Sebastian_`);
     }
 
     if (arg[0].toLowerCase() === "warncount" && arg[1]) {
@@ -146,7 +145,7 @@ zokou({
             const config = JSON.parse(fs.readFileSync(antilinkPath));
             config.warnCount = count;
             fs.writeFileSync(antilinkPath, JSON.stringify(config, null, 2));
-            return repondre(`✅ *Warn count set to:* ${count}\n\n_Powered by Rahmany_`);
+            return repondre(`✅ *Warn count set to:* ${count}\n\n_Powered by Sebastian_`);
         } catch (e) {
             return repondre("❌ Failed to update warn count.");
         }
@@ -165,7 +164,7 @@ zokou({
         }
         
         resetUserWarns(targetUser, dest);
-        return repondre(`✅ *Warns reset for @${targetUser.split('@')[0]}*\n\n_Powered by Rahmany_`);
+        return repondre(`✅ *Warns reset for @${targetUser.split('@')[0]}*\n\n_Powered by Sebastian_`);
     }
 
     if (arg[0].toLowerCase() === "action" && arg[1]) {
@@ -178,7 +177,7 @@ zokou({
             const config = JSON.parse(fs.readFileSync(antilinkPath));
             config.action = action;
             fs.writeFileSync(antilinkPath, JSON.stringify(config, null, 2));
-            return repondre(`✅ *Antilink action set to:* ${action.toUpperCase()}\n\n_Powered by Rahmany_`);
+            return repondre(`✅ *Antilink action set to:* ${action.toUpperCase()}\n\n_Powered by Sebastian_`);
         } catch (e) {
             return repondre("❌ Failed to update action.");
         }
@@ -200,8 +199,8 @@ zokou({
                 ? `✅ *ANTILINK ENABLED*\n\n` +
                   `Action: ${config.action.toUpperCase()}\n` +
                   `Warn Count: ${config.warnCount}\n\n` +
-                  `_Powered by Rahmany_`
-                : `⚠️ *ANTILINK DISABLED*\n\n_Powered by Rahmany_`
+                  `_Powered by Sebastian_`
+                : `⚠️ *ANTILINK DISABLED*\n\n_Powered by Sebastian_`
         );
     } catch (e) {
         await repondre("❌ Failed to update antilink configuration.");

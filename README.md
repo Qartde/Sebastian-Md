@@ -1,81 +1,112 @@
-
-<p align="center">                                                  sᴇʙᴀ-ᴍᴅ
-  
-
+<h1 align="center">⚡ SEBA CMD - WhatsApp Bot ⚡</h1>
+<p align="center">
+  <img src="https://files.catbox.moe/2yarwr.png" alt="SEBA CMD" width="400"/>
 </p>
-<p align="center"> 
+
+<p align="center">
+  <a href="https://git.io/typing-svg">
+    <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&pause=1000&random=false&width=435&lines=THIS+IS+SEBA+CMD+MADE+IN+TANZANIA" alt="Typing SVG" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/bravesebastian458-dotcom/Sebastian-Md/stargazers">
+    <img src="https://img.shields.io/github/stars/bravesebastian458-dotcom/Sebastian-Md?style=for-the-badge&color=yellow">
+  </a>
+  <a href="https://github.com/bravesebastian458-dotcom/Sebastian-Md/network/members">
+    <img src="https://img.shields.io/github/forks/bravesebastian458-dotcom/Sebastian-Md?style=for-the-badge&color=green">
+  </a>
+  <a href="https://github.com/bravesebastian458-dotcom/Sebastian-Md/watchers">
+    <img src="https://img.shields.io/github/watchers/bravesebastian458-dotcom/Sebastian-Md?style=for-the-badge&color=blue">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/bravesebastian458-dotcom/Sebastian-Md">
+    <img src="https://img.shields.io/badge/Version-2.0.0-purple?style=for-the-badge&logo=github">
+  </a>
   <a href="https://whatsapp.com/channel/0029Vb7LxhRGE56l9woRjd2g">
-    <img alt=Support height="390" src="https://files.catbox.moe/2yarwr.png"> 
-    </p>
- 
- 
- 
+    <img src="https://img.shields.io/badge/Channel-Join-25D366?style=for-the-badge&logo=whatsapp">
+  </a>
+  <a href="https://wa.me/255612619717">
+    <img src="https://img.shields.io/badge/Contact-Owner-25D366?style=for-the-badge&logo=whatsapp">
+  </a>
+</p>
 
+<hr>
 
-<a href="https://git.io/typing-svg"><img src="https://readme-typing-svg.demolab.com?font=Fira+Code&pause=1000&random=false&width=435&lines=THIS+IS+SEBA CMD+MADE+IN+TANZANIA" alt="Typing SVG" /></a>
+<a><img src='https://i.imgur.com/LyHic3i.gif'/></a>
 
+## 📌 *ABOUT SEBA CMD*
 
+**SEBA CMD** is a powerful WhatsApp bot developed in **Tanzania** with love and passion. This bot comes with advanced features including anti-link, anti-delete, anti-bot, group management, and much more!
 
-<a><img src='https://i.imgur.com/LyHic3i.gif'/></a><a><img src='https://i.imgur.com/LyHic3i.gif'/></a>
+<p align="center">
+  <img src="https://readme-typing-svg.demolab.com?font=Black+Ops+One&size=30&pause=1000&color=1BAFBAFF&center=true&width=600&height=60&lines=CREATED+BY+SEBA+CMD;RELEASED+26.3.2025;MADE+IN+TANZANIA+🇹🇿" alt="Typing SVG" />
+</p>
 
+<a><img src='https://i.imgur.com/LyHic3i.gif'/></a>
 
-#### SETUP Fork 👇
+## ✨ *FEATURES*
 
+| Feature | Description |
+|---------|-------------|
+| **🔗 Anti-Link** | Automatically deletes links in groups |
+| **🗑️ Anti-Delete** | Saves deleted messages and forwards to owner |
+| **🤖 Anti-Bot** | Detects and removes other bots |
+| **👥 Group Management** | Add, remove, promote, demote members |
+| **📥 Downloader** | Download from YouTube, TikTok, Instagram, etc. |
+| **🎮 Fun Commands** | Jokes, games, and entertainment |
+| **🤖 AI Features** | GPT, Bard, DALL-E integration |
+| **📊 Level System** | Track user activity and ranks |
+| **👋 Welcome/Goodbye** | Custom welcome and goodbye messages |
 
-<a href='https://github.com/bravesebastian458-dotcom/Sebastian-Md' target="_blank"><img alt='𝔽𝕆ℝ𝕂 𝕋ℍ𝕀𝕊 ℝ𝔼ℙ𝕆' src='https://img.shields.io/badge/Fork This Repo-black?style=for-the-badge&logo=git&logoColor=grey'/></a>
+<a><img src='https://i.imgur.com/LyHic3i.gif'/></a>
 
+## 🚀 *QUICK SETUP*
 
- 
-#### PAIR CODE
+### **Step 1: Fork This Repository**
 
-<a href='https://rahmani-4.onrender.com/pair' target="_blank"><img alt='Get Session ID' src='https://img.shields.io/badge/Click here to get your session id-black?style=for-the-badge&logo=opencv&logoColor=pink'/></a>
- 
+<a href='https://github.com/bravesebastian458-dotcom/Sebastian-Md/fork' target="_blank">
+  <img alt='Fork This Repo' src='https://img.shields.io/badge/FORK%20THIS%20REPO-black?style=for-the-badge&logo=git&logoColor=grey' width="300"/>
+</a>
 
-<a><img src='https://i.imgur.com/LyHic3i.gif'/></a><a><img src='https://i.imgur.com/LyHic3i.gif'/></a>
+### **Step 2: Get Session ID**
 
+<a href='https://heroku-pair.onrender.com/pair' target="_blank">
+  <img alt='Get Session ID' src='https://img.shields.io/badge/GET%20SESSION%20ID-black?style=for-the-badge&logo=opencv&logoColor=pink' width="300"/>
+</a>
 
-#### DEPLOY TO HEROKU 
-1. `If You Don't Have An Account On Heroku`
+<a><img src='https://i.imgur.com/LyHic3i.gif'/></a>
 
-- <a align="center"><a href="https://signup.heroku.com">
- <img src="https://img.shields.io/badge/Create%20Account%20Now-blue?style=for-the-badge&logo=heroku" width="220" height="38.45"/></a></p>
+## 📦 *DEPLOYMENT OPTIONS*
 
-2. `If You Have a Heroku Account`
+### **Option 1: Deploy to Heroku**
 
-  - <a align="center"><a href="https://dashboard.heroku.com/new?template=https://github.com/bravesebastian458-dotcom/Sebastian-Md"> <img src="https://img.shields.io/badge/DEPLOY%20NOW-blue?style=for-the-badge&logo=heroku" width="220" height="38.45"/></a></p>
+#### *Don't have a Heroku account?*
 
+<a href="https://signup.heroku.com" target="_blank">
+  <img src="https://img.shields.io/badge/CREATE%20HEROKU%20ACCOUNT-blue?style=for-the-badge&logo=heroku" width="300"/>
+</a>
 
-<a><img src='https://i.imgur.com/LyHic3i.gif'/></a><a><img src='https://i.imgur.com/LyHic3i.gif'/></a>
+#### *Already have a Heroku account?*
 
+<a href="https://dashboard.heroku.com/new?template=https://github.com/bravesebastian458-dotcom/Sebastian-Md" target="_blank">
+  <img src="https://img.shields.io/badge/DEPLOY%20TO%20HEROKU-blue?style=for-the-badge&logo=heroku" width="300"/>
+</a>
 
+### **Option 2: Deploy to Railway**
 
+<a href="https://railway.app/new" target="_blank">
+  <img src="https://img.shields.io/badge/DEPLOY%20TO%20RAILWAY-purple?style=for-the-badge&logo=railway" width="300"/>
+</a>
 
+### **Option 3: Deploy to Replit**
 
+<a href="https://replit.com/new" target="_blank">
+  <img src="https://img.shields.io/badge/DEPLOY%20TO%20REPLIT-orange?style=for-the-badge&logo=replit" width="300"/>
+</a>
 
+<a><img src='https://i.imgur.com/LyHic3i.gif'/></a>
 
-For any issues or to stay updated, use the options below:  
-
-✅ Contact Me on WhatsApp  
-[![Contact Me on WhatsApp](https://img.shields.io/static/v1?label=Contact%20Me%20on%20WhatsApp&message=Message&color=25D366&style=for-the-badge&logo=whatsapp&logoColor=white)](https://wa.me/255612619717) = 
-
-<br>
-
-✅ Follow My WhatsApp Channel 
-
-[![Follow My WhatsApp Channel](https://img.shields.io/static/v1?label=Follow%20My%20WhatsApp%20Channel&message=follow&color=25D366&style=for-the-badge&logo=whatsapp&logoColor=white)](https://whatsapp.com/channel/0029Vb7LxhRGE56l9woRjd2g)  
-
-<a><img src='https://i.imgur.com/LyHic3i.gif'/></a><a><img src='https://i.imgur.com/LyHic3i.gif'/></a>
-
-
-
-
-
-𝚃𝙷𝙰𝙽𝙺 𝚈𝙾𝚄 𝙵𝙾𝚁 𝙲𝙷𝙾𝙾𝚂𝙸𝙽𝙶 𝐒𝐄𝐁𝐀 𝐂𝐌𝐃 𝐁𝐎𝐓
-
-
-
-       💛 𝐒𝐔𝐏𝐑𝐄𝐌𝐄 𝐆𝐎𝐃 💚
-
-
-
-<a href="https://git.io/typing-svg"><img src="https://readme-typing-svg.demolab.com?font=Black+Ops+One&size=50&pause=1000&color=1BAFBAFF&center=true&width=910&height=100&lines=THANKS FOR YOUR +SUPPORT-DONT; FORGET+TO+FORK+MYrepo;CREATED+BY+SEBA CMD;RELEASED+26.3.2025" alt="Typing SVG" /></a>
+## 📱 *COMMANDS*

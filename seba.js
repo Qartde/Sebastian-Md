@@ -47,6 +47,9 @@ const  {addGroupToBanList,isGroupBanned,removeGroupFromBanList} = require("./bdd
 const {isGroupOnlyAdmin,addGroupToOnlyAdminList,removeGroupFromOnlyAdminList} = require("./bdd/onlyAdmin");
 let { reagir } = require(__dirname + "/framework/app");
 
+// ============ IMPORT ANTILINK FUNCTIONS ============
+const { handleAntilink } = require("./commandes/antilink");
+
 var session = conf.session.replace(/Zokou-MD-WHATSAPP-BOT;;;=>/g,"");
 const prefixe = conf.PREFIXE;
 const more = String.fromCharCode(8206);
@@ -157,166 +160,6 @@ setTimeout(() => {
 
         const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
         let lastReactionTime = 0;
-
-        // ==================== FIXED ANTI-LINK SECTION WITH DEBUG LOGS ====================
-        zk.ev.on("messages.upsert", async (m) => {
-            const { messages } = m;
-            
-            for (const ms of messages) {
-                if (!ms.message) continue;
-                
-                // Get message content
-                const mtype = (0, baileys_1.getContentType)(ms.message);
-                let text = "";
-                
-                if (mtype === "conversation") {
-                    text = ms.message.conversation || "";
-                } else if (mtype === "extendedTextMessage") {
-                    text = ms.message.extendedTextMessage?.text || "";
-                } else if (mtype === "imageMessage") {
-                    text = ms.message.imageMessage?.caption || "";
-                } else if (mtype === "videoMessage") {
-                    text = ms.message.videoMessage?.caption || "";
-                }
-                
-                if (!text) continue;
-                
-                const from = ms.key.remoteJid;
-                const isGroup = from?.endsWith("@g.us");
-                
-                // Only process group messages
-                if (!isGroup) continue;
-                
-                // Get sender info
-                const sender = ms.key.participant || from;
-                const botId = zk.user.id.split(':')[0] + '@s.whatsapp.net';
-                
-                // Get group metadata to check admins
-                const groupMetadata = await getGroupMetadata(zk, from);
-                if (!groupMetadata) continue;
-                
-                const participants = groupMetadata.participants || [];
-                const admins = participants.filter(p => p.admin).map(p => p.id);
-                const isSenderAdmin = admins.includes(sender);
-                const isBotAdmin = admins.includes(botId);
-                
-                // Check if antilink is enabled for this group
-                const antilinkEnabled = await verifierEtatJid(from).catch(() => false);
-                
-                console.log(`📨 Message from ${sender.split('@')[0]} in ${from}`);
-                console.log(`📝 Content: ${text.substring(0, 50)}...`);
-                console.log(`👑 Is Admin: ${isSenderAdmin}`);
-                console.log(`🤖 Bot Admin: ${isBotAdmin}`);
-                console.log(`🔗 Antilink Enabled: ${antilinkEnabled}`);
-                
-                // Skip if antilink is disabled, sender is admin, or bot is not admin
-                if (!antilinkEnabled) {
-                    console.log("❌ Antilink is disabled for this group");
-                    continue;
-                }
-                
-                if (isSenderAdmin) {
-                    console.log("✅ Sender is admin - link allowed");
-                    continue;
-                }
-                
-                if (!isBotAdmin) {
-                    console.log("❌ Bot is not admin - cannot delete");
-                    // Still continue to check link but won't delete
-                }
-                
-                // Comprehensive link detection patterns
-                const linkPatterns = [
-                    /https?:\/\/[^\s]+/gi,
-                    /wa\.me\/[^\s]+/gi,
-                    /chat\.whatsapp\.com\/[^\s]+/gi,
-                    /t\.me\/[^\s]+/gi,
-                    /telegram\.me\/[^\s]+/gi,
-                    /instagram\.com\/[^\s]+/gi,
-                    /facebook\.com\/[^\s]+/gi,
-                    /youtu\.be\/[^\s]+/gi,
-                    /youtube\.com\/[^\s]+/gi,
-                    /tiktok\.com\/[^\s]+/gi,
-                    /twitter\.com\/[^\s]+/gi,
-                    /x\.com\/[^\s]+/gi,
-                    /discord\.gg\/[^\s]+/gi,
-                    /whatsapp\.com\/channel\/[^\s]+/gi
-                ];
-                
-                const hasLink = linkPatterns.some(pattern => pattern.test(text));
-                
-                if (hasLink) {
-                    console.log(`🔗 LINK DETECTED from ${sender.split('@')[0]} in ${from}`);
-                    
-                    // Try to delete message if bot is admin
-                    if (isBotAdmin) {
-                        try {
-                            // Delete the message immediately
-                            const key = {
-                                remoteJid: from,
-                                fromMe: false,
-                                id: ms.key.id,
-                                participant: sender
-                            };
-                            
-                            await zk.sendMessage(from, { delete: key });
-                            console.log(`✅ Link deleted successfully`);
-                            
-                            // Get action for this group
-                            const action = await recupererActionJid(from).catch(() => 'delete');
-                            
-                            // Send warning based on action
-                            if (action === 'remove') {
-                                // Remove member from group
-                                await zk.groupParticipantsUpdate(from, [sender], "remove");
-                                await zk.sendMessage(from, { 
-                                    text: `⚠️ @${sender.split('@')[0]} has been removed for sending a link.`,
-                                    mentions: [sender]
-                                });
-                                
-                            } else if (action === 'warn') {
-                                // Warning system
-                                const { getWarnCountByJID, ajouterUtilisateurAvecWarnCount } = require('./bdd/warn');
-                                let warn = await getWarnCountByJID(sender).catch(() => 0) || 0;
-                                let warnLimit = conf.WARN_COUNT || 3;
-                                
-                                if (warn + 1 >= warnLimit) {
-                                    await zk.groupParticipantsUpdate(from, [sender], "remove");
-                                    await zk.sendMessage(from, { 
-                                        text: `⚠️ @${sender.split('@')[0]} has been removed for reaching warn limit (${warnLimit}).`,
-                                        mentions: [sender]
-                                    });
-                                } else {
-                                    await ajouterUtilisateurAvecWarnCount(sender).catch(() => {});
-                                    await zk.sendMessage(from, { 
-                                        text: `⚠️ @${sender.split('@')[0]} do not send links!\n*Warning:* ${warn + 1}/${warnLimit}`,
-                                        mentions: [sender]
-                                    });
-                                }
-                            } else {
-                                // Default: delete only
-                                await zk.sendMessage(from, { 
-                                    text: `⚠️ @${sender.split('@')[0]} links are not allowed here!`,
-                                    mentions: [sender]
-                                });
-                            }
-                        } catch (err) {
-                            console.error("❌ Anti-link error:", err);
-                        }
-                    } else {
-                        console.log("❌ Cannot delete - bot is not admin");
-                        // Still send warning
-                        await zk.sendMessage(from, { 
-                            text: `⚠️ @${sender.split('@')[0]} links are not allowed here!\n❌ Cannot delete - bot is not admin.`,
-                            mentions: [sender]
-                        });
-                    }
-                } else {
-                    console.log("ℹ️ No link found");
-                }
-            }
-        });
-        // ==================== END OF FIXED ANTI-LINK ====================
 
         // Auto-react to status updates
         if (conf.AUTO_REACT_STATUS === "yes") {
@@ -684,6 +527,30 @@ setTimeout(() => {
                     }
                 }
             } catch (error) {}
+
+            // ============ ANTILINK HANDLER (IMPORTED) ============
+            try {
+                if (verifGroupe) {
+                    const linkResult = await handleAntilink(
+                        zk, 
+                        ms, 
+                        auteurMessage, 
+                        origineMessage, 
+                        verifAdmin, 
+                        verifZokouAdmin, 
+                        superUser
+                    );
+                    
+                    if (linkResult) {
+                        console.log("✅ Antilink handled the message");
+                        // If you want to stop processing this message, uncomment:
+                        // return;
+                    }
+                }
+            } catch (antilinkError) {
+                console.log("❌ Antilink error:", antilinkError.message);
+            }
+            // ============ END ANTILINK ============
 
             // Anti-bot (keeping your original anti-bot code)
             try {
