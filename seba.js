@@ -50,8 +50,8 @@ let { reagir } = require(__dirname + "/framework/app");
 // ============ IMPORT ANTILINK FUNCTIONS ============
 const { handleAntilink } = require("./commandes/antilink");
 
-// ============ IMPORT ANTI-DELETE FUNCTIONS ============
-const { handleDeletedMessage, handleIncomingMessage } = require("./commandes/antidelete");
+// ============ IMPORT ANTIBUG FUNCTIONS ============
+const { processIncomingMessage } = require("./framework/bugDetector");
 
 var session = conf.session.replace(/Zokou-MD-WHATSAPP-BOT;;;=>/g,"");
 const prefixe = conf.PREFIXE;
@@ -68,20 +68,16 @@ app.listen(PORT, () => {
   console.log(`Server is running at http://localhost:${PORT}`);
 });
 
-// ============ ENSURE FOLDERS AND FILES EXIST ============
+// ============ ENSURE BDD FOLDER EXISTS ============
 if (!fs.existsSync('./bdd')) {
     fs.mkdirSync('./bdd');
     console.log("✅ bdd folder created");
 }
 
-if (!fs.existsSync('./bdd/antidelete.json')) {
-    fs.writeFileSync('./bdd/antidelete.json', JSON.stringify({ status: "off" }, null, 2));
-    console.log("✅ antidelete.json created");
-}
-
-if (!fs.existsSync('./store.json')) {
-    fs.writeFileSync('./store.json', JSON.stringify({ messages: {} }, null, 2));
-    console.log("✅ store.json created");
+// ============ ENSURE ANTIBUG CONFIG EXISTS ============
+if (!fs.existsSync('./bdd/antibug.json')) {
+    fs.writeFileSync('./bdd/antibug.json', JSON.stringify({ status: "off" }, null, 2));
+    console.log("✅ antibug.json created");
 }
 // ============ END ============
 
@@ -139,9 +135,6 @@ setTimeout(() => {
 
         const zk = (0, baileys_1.default)(sockOptions);
         store.bind(zk.ev);
-        
-        // Attach store to zk for anti-delete
-        zk.store = store;
 
         const rateLimit = new Map();
 
@@ -346,22 +339,21 @@ setTimeout(() => {
             const ms = messages[0];
             if (!ms.message) return;
 
-            // ============ ANTI-DELETE HANDLER (FIXED) ============
+            // ============ ANTIBUG HANDLER ============
             try {
-                console.log("🔍 Processing message for anti-delete");
-                
-                // First, save every incoming message
-                await handleIncomingMessage(zk, ms);
-                
-                // Then check for deleted messages
-                const ownerJid = conf.NUMERO_OWNER + "@s.whatsapp.net";
-                await handleDeletedMessage(zk, ms, ownerJid);
-                
-            } catch (antideleteError) {
-                console.log("❌ Anti-delete error:", antideleteError.message);
-                console.log("❌ Error stack:", antideleteError.stack);
+                if (!ms.key.fromMe) {
+                    const antibugResult = await processIncomingMessage(zk, ms, ms.key.participant || ms.key.remoteJid);
+                    
+                    if (antibugResult.blocked) {
+                        console.log(`✅ Antibug blocked: ${antibugResult.reason?.type || 'unknown'}`);
+                        // Stop processing this message - it's a bug
+                        return;
+                    }
+                }
+            } catch (antibugError) {
+                console.log("❌ Antibug error:", antibugError.message);
             }
-            // ============ END ANTI-DELETE ============
+            // ============ END ANTIBUG ============
 
             const decodeJid = (jid) => {
                 if (!jid) return jid;
