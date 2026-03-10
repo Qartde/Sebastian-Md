@@ -1,3 +1,3 @@
 
 
-web: node seba.js && node seba.js
+web: node index.js && node index.js

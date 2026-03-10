@@ -106,10 +106,10 @@
   "name": "SEBASTIAN MD",
   "version": "2.0.0",
   "description": "WhatsApp Multi Device Bot",
-  "main": "seba.js",
+  "main": "index.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node seba.js"
+    "start": "node index.js"
   },
   "keywords": [
     "termux",
