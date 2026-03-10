@@ -208,77 +208,7 @@ zokou({ nomCom: "demote", categorie: 'Group', reaction: "👨🏿‍💼" }, asy
 
 /** ***fin démettre****  **/
 /** **retirer** */
-zokou({ nomCom: "remove", categorie: 'Group', reaction: "👨🏿‍💼" }, async (dest, zk, commandeOptions) => {
-  let { repondre, msgRepondu, infosGroupe, auteurMsgRepondu, verifGroupe, nomAuteurMessage, auteurMessage, superUser, idBot } = commandeOptions;
-  let membresGroupe = verifGroupe ? await infosGroupe.participants : ""
-  if (!verifGroupe) { return repondre("for groups only"); }
 
-
-  const verifMember = (user) => {
-
-    for (const m of membresGroupe) {
-      if (m.id !== user) {
-        continue;
-      }
-      else { return true }
-      //membre=//(m.id==auteurMsgRepondu? return true) :false;
-    }
-  }
-
-  const memberAdmin = (membresGroupe) => {
-    let admin = [];
-    for (m of membresGroupe) {
-      if (m.admin == null) continue;
-      admin.push(m.id);
-
-    }
-    // else{admin= false;}
-    return admin;
-  }
-
-  const a = verifGroupe ? memberAdmin(membresGroupe) : '';
-
-
-  let admin = verifGroupe ? a.includes(auteurMsgRepondu) : false;
-  let membre = verifMember(auteurMsgRepondu)
-  let autAdmin = verifGroupe ? a.includes(auteurMessage) : false;
-  zkad = verifGroupe ? a.includes(idBot) : false;
-  try {
-    // repondre(verifZokouAdmin)
-
-    if (autAdmin || superUser) {
-      if (msgRepondu) {
-        if (zkad) {
-          if (membre) {
-            if (admin == false) {
-              const gifLink = "https://raw.githubusercontent.com/djalega8000/Zokou-MD/main/media/remover.gif"
-              var sticker = new Sticker(gifLink, {
-                pack: 'Zokou-Md', // The pack name
-                author: nomAuteurMessage, // The author name
-                type: StickerTypes.FULL, // The sticker type
-                categories: ['🤩', '🎉'], // The sticker category
-                id: '12345', // The sticker id
-                quality: 50, // The quality of the output file
-                background: '#000000'
-              });
-
-              await sticker.toFile("st.webp")
-              var txt = `@${auteurMsgRepondu.split("@")[0]} was removed from the group.\n`
-            /*  zk.sendMessage(dest, { sticker: fs.readFileSync("st.webp") }, { quoted: ms.message.extendedTextMessage.contextInfo.stanzaId})*/
-              await zk.groupParticipantsUpdate(dest, [auteurMsgRepondu], "remove");
-              zk.sendMessage(dest, { text: txt, mentions: [auteurMsgRepondu] })
-
-            } else { repondre("This member cannot be removed because he is an administrator of the group.") }
-
-          } else { return repondre("This user is not part of the group."); }
-        }
-        else { return repondre("Sorry, I cannot perform this action because I am not an administrator of the group.") }
-
-      } else { repondre("please tag the member to be removed"); }
-    } else { return repondre("Sorry I cannot perform this action because you are not an administrator of the group .") }
-  } catch (e) { repondre("oups " + e) }
-
-})
 
 
 /** *****fin retirer */
