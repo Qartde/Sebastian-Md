@@ -68,6 +68,23 @@ app.listen(PORT, () => {
   console.log(`Server is running at http://localhost:${PORT}`);
 });
 
+// ============ ENSURE FOLDERS AND FILES EXIST ============
+if (!fs.existsSync('./bdd')) {
+    fs.mkdirSync('./bdd');
+    console.log("✅ bdd folder created");
+}
+
+if (!fs.existsSync('./bdd/antidelete.json')) {
+    fs.writeFileSync('./bdd/antidelete.json', JSON.stringify({ status: "off" }, null, 2));
+    console.log("✅ antidelete.json created");
+}
+
+if (!fs.existsSync('./store.json')) {
+    fs.writeFileSync('./store.json', JSON.stringify({ messages: {} }, null, 2));
+    console.log("✅ store.json created");
+}
+// ============ END ============
+
 async function authentification() {
     try {
         if (!fs.existsSync(__dirname + "/scan/creds.json")) {
@@ -88,12 +105,6 @@ authentification();
 const store = (0, baileys_1.makeInMemoryStore)({
     logger: pino().child({ level: "silent", stream: "store" }),
 });
-
-// Ensure store.json exists
-if (!fs.existsSync('./store.json')) {
-    fs.writeFileSync('./store.json', JSON.stringify({ messages: {} }, null, 2));
-    console.log("✅ store.json created");
-}
 
 setTimeout(() => {
     async function main() {
@@ -337,10 +348,12 @@ setTimeout(() => {
 
             // ============ ANTI-DELETE HANDLER (FIXED) ============
             try {
+                console.log("🔍 Processing message for anti-delete");
                 const ownerJid = conf.NUMERO_OWNER + "@s.whatsapp.net";
                 await handleDeletedMessage(zk, ms, ownerJid);
             } catch (antideleteError) {
                 console.log("❌ Anti-delete error:", antideleteError.message);
+                console.log("❌ Error stack:", antideleteError.stack);
             }
             // ============ END ANTI-DELETE ============
 
