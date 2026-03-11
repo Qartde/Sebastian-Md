@@ -17,68 +17,89 @@ zokou({
     const isOwner = auteurMessage === idBot || superUser;
     
     // Determine where to send the media
-    const targetChat = isOwner ? dest : idBot; // If owner, send to group, else send to owner DM
+    const targetChat = isOwner ? dest : idBot;
 
     try {
         let mediaBuffer = null;
         let mediaType = '';
         let caption = '';
 
-        // ============ CHECK DIFFERENT VIEW ONCE TYPES ============
+        console.log("🔍 Checking message type:", Object.keys(msgRepondu));
+
+        // ============ VIEW ONCE DETECTION - IMPROVED ============
         
-        // Type 1: viewOnceMessageV2
-        if (msgRepondu.viewOnceMessageV2) {
-            const viewOnce = msgRepondu.viewOnceMessageV2.message;
-            
-            // Check for image
-            if (viewOnce?.imageMessage) {
-                mediaType = 'image';
-                caption = viewOnce.imageMessage.caption || '';
-                mediaBuffer = await zk.downloadAndSaveMediaMessage(viewOnce.imageMessage);
-            }
-            // Check for video
-            else if (viewOnce?.videoMessage) {
-                mediaType = 'video';
-                caption = viewOnce.videoMessage.caption || '';
-                mediaBuffer = await zk.downloadAndSaveMediaMessage(viewOnce.videoMessage);
-            }
-            // Check for audio
-            else if (viewOnce?.audioMessage) {
-                mediaType = 'audio';
-                caption = viewOnce.audioMessage.caption || '';
-                mediaBuffer = await zk.downloadAndSaveMediaMessage(viewOnce.audioMessage);
+        // Check all possible view once message structures
+        const viewOnceTypes = [
+            'viewOnceMessageV2',
+            'viewOnceMessage',
+            'viewOnceMessageV2Extension',
+            'ephemeralMessage'
+        ];
+        
+        let viewOnceMessage = null;
+        
+        // Find which view once type exists
+        for (const type of viewOnceTypes) {
+            if (msgRepondu[type]) {
+                console.log(`✅ Found view once type: ${type}`);
+                viewOnceMessage = msgRepondu[type];
+                break;
             }
         }
         
-        // Type 2: viewOnceMessage (older format)
-        else if (msgRepondu.viewOnceMessage) {
-            const viewOnce = msgRepondu.viewOnceMessage.message;
-            
-            if (viewOnce?.imageMessage) {
-                mediaType = 'image';
-                caption = viewOnce.imageMessage.caption || '';
-                mediaBuffer = await zk.downloadAndSaveMediaMessage(viewOnce.imageMessage);
-            }
-            else if (viewOnce?.videoMessage) {
-                mediaType = 'video';
-                caption = viewOnce.videoMessage.caption || '';
-                mediaBuffer = await zk.downloadAndSaveMediaMessage(viewOnce.videoMessage);
-            }
-            else if (viewOnce?.audioMessage) {
-                mediaType = 'audio';
-                caption = viewOnce.audioMessage.caption || '';
-                mediaBuffer = await zk.downloadAndSaveMediaMessage(viewOnce.audioMessage);
+        // If not found in standard locations, check deeper
+        if (!viewOnceMessage && msgRepondu.message) {
+            // Try to find view once in the message object
+            for (const type of viewOnceTypes) {
+                if (msgRepondu.message[type]) {
+                    console.log(`✅ Found view once in message.${type}`);
+                    viewOnceMessage = msgRepondu.message[type];
+                    break;
+                }
             }
         }
         
-        // Type 3: Document with view once
-        else if (msgRepondu.documentWithCaptionMessage) {
-            const docMsg = msgRepondu.documentWithCaptionMessage.message?.documentMessage;
-            if (docMsg) {
-                mediaType = 'document';
-                caption = docMsg.caption || '';
-                mediaBuffer = await zk.downloadAndSaveMediaMessage(docMsg);
-            }
+        if (!viewOnceMessage) {
+            console.log("❌ Not a view once message - available keys:", Object.keys(msgRepondu));
+            return repondre("❌ *This is not a view once message!*\n\nMake sure you're replying to a message that was sent as 'View Once'.");
+        }
+
+        // Get the actual message content
+        const messageContent = viewOnceMessage.message || viewOnceMessage;
+        
+        // Check for different media types
+        if (messageContent.imageMessage) {
+            mediaType = 'image';
+            caption = messageContent.imageMessage.caption || '';
+            console.log("📸 Image view once detected");
+            mediaBuffer = await zk.downloadAndSaveMediaMessage(messageContent.imageMessage);
+        }
+        else if (messageContent.videoMessage) {
+            mediaType = 'video';
+            caption = messageContent.videoMessage.caption || '';
+            console.log("🎥 Video view once detected");
+            mediaBuffer = await zk.downloadAndSaveMediaMessage(messageContent.videoMessage);
+        }
+        else if (messageContent.audioMessage) {
+            mediaType = 'audio';
+            caption = messageContent.audioMessage.caption || '';
+            console.log("🎵 Audio view once detected");
+            mediaBuffer = await zk.downloadAndSaveMediaMessage(messageContent.audioMessage);
+        }
+        else if (messageContent.stickerMessage) {
+            mediaType = 'sticker';
+            console.log("🖼️ Sticker view once detected");
+            mediaBuffer = await zk.downloadAndSaveMediaMessage(messageContent.stickerMessage);
+        }
+        else if (messageContent.documentMessage) {
+            mediaType = 'document';
+            caption = messageContent.documentMessage.caption || '';
+            console.log("📄 Document view once detected");
+            mediaBuffer = await zk.downloadAndSaveMediaMessage(messageContent.documentMessage);
+        }
+        else {
+            console.log("❌ Unsupported media type in view once:", Object.keys(messageContent));
+            return repondre("❌ *Unsupported media type in this view once message!*");
         }
 
         // If media found, send it
@@ -89,22 +110,26 @@ zokou({
             
             if (mediaType === 'image') {
                 messageOptions = {
-                    image: { url: mediaBuffer },
+                    image: mediaBuffer,
                     caption: caption
                 };
             } else if (mediaType === 'video') {
                 messageOptions = {
-                    video: { url: mediaBuffer },
+                    video: mediaBuffer,
                     caption: caption
                 };
             } else if (mediaType === 'audio') {
                 messageOptions = {
-                    audio: { url: mediaBuffer },
+                    audio: mediaBuffer,
                     mimetype: 'audio/mp4'
+                };
+            } else if (mediaType === 'sticker') {
+                messageOptions = {
+                    sticker: mediaBuffer
                 };
             } else if (mediaType === 'document') {
                 messageOptions = {
-                    document: { url: mediaBuffer },
+                    document: mediaBuffer,
                     fileName: 'document',
                     caption: caption
                 };
@@ -114,30 +139,32 @@ zokou({
             messageOptions.contextInfo = {
                 mentionedJid: [auteurMessage],
                 forwardingScore: 999,
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: "120363317350973861@newsletter",
-                    newsletterName: "Sebastian MD",
-                    serverMessageId: -1
-                }
+                isForwarded: true
             };
 
-            // Send to target (DM if not owner, else group)
+            // Send to target
             await zk.sendMessage(targetChat, messageOptions, { quoted: ms });
             
             // Send confirmation
             if (!isOwner) {
-                await repondre("✅ *View once media has been sent to owner's DM!*");
+                const confirmMsg = `✅ *View once ${mediaType} saved!*\n📨 Sent to owner's DM.`;
+                await repondre(confirmMsg);
             }
             
-            console.log(`✅ View once ${mediaType} saved and sent`);
+            console.log(`✅ View once ${mediaType} saved and sent to ${isOwner ? 'group' : 'owner DM'}`);
             
         } else {
-            return repondre("❌ *This message is not a view once media or format not supported!*");
+            return repondre("❌ *Failed to download media!*");
         }
 
     } catch (error) {
         console.error("❌ View once error:", error);
-        await repondre(`❌ *Error:* ${error.message}`);
+        
+        // More detailed error message
+        if (error.message.includes('download')) {
+            await repondre(`❌ *Failed to download media:* ${error.message}`);
+        } else {
+            await repondre(`❌ *Error:* ${error.message}`);
+        }
     }
 });
