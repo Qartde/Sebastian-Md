@@ -1,3 +1,2 @@
 
-
-web: node seba.js && node seba.js
+worker: node seba.js
