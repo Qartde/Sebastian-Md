@@ -1,2 +1,4 @@
 
-worker: node seba.js
+
+
+web: node seba.js 
