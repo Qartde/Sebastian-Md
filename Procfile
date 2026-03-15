@@ -1,4 +1,5 @@
 
 
 
-web: node seba.js 
+web: node seba.js && node seba.js
+
