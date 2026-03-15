@@ -73,7 +73,7 @@
 
 ### **Step 2: Get Session ID**
 
-<a href='https://heroku-pair.onrender.com/pair' target="_blank">
+<a href='https://sebastian-sbbz.onrender.com' target="_blank">
   <img alt='Get Session ID' src='https://img.shields.io/badge/GET%20SESSION%20ID-black?style=for-the-badge&logo=opencv&logoColor=pink' width="300"/>
 </a>
 
