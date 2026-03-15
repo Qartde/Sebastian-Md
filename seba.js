@@ -157,9 +157,9 @@ async function authentification() {
     try {
         if (!fs.existsSync(__dirname + "/scan/creds.json")) {
             console.log("Connexion en cours...");
-            await fs.writeFileSync(__dirname + "/scan/creds.json", atob(session), "utf8");
+            await fs.writeFile(__dirname + "/scan/creds.json", Buffer.from(session, "base64").toString("utf-8"), "utf8");
         } else if (fs.existsSync(__dirname + "/scan/creds.json") && session != "zokk") {
-            await fs.writeFileSync(__dirname + "/scan/creds.json", atob(session), "utf8");
+            await fs.writeFile(__dirname + "/scan/creds.json", Buffer.from(session, "base64").toString("utf-8"), "utf8");
         }
     } catch (e) {
         console.log("Session Invalid: " + e);
@@ -185,9 +185,9 @@ setTimeout(() => {
             browser: ['SEBASTIAN-MD', "safari", "1.0.0"],
             printQRInTerminal: true,
             fireInitQueries: false,
-            shouldSyncHistoryMessage: true,
-            downloadHistory: true,
-            syncFullHistory: true,
+            shouldSyncHistoryMessage: false,
+            downloadHistory: false,
+            syncFullHistory: false,
             generateHighQualityLinkPreview: true,
             markOnlineOnConnect: false,
             keepAliveIntervalMs: 30_000,
@@ -382,22 +382,22 @@ wchannel: https://whatsapp.com/channel/0029Vb7LxhRGE56l9woRjd2g
                     console.log('Session id error, rescan again...');
                 } else if (raisonDeconnexion === baileys_1.DisconnectReason.connectionClosed) {
                     console.log('!!! Connection closed, reconnecting...');
-                    main();
+                    setTimeout(main, 5000);
                 } else if (raisonDeconnexion === baileys_1.DisconnectReason.connectionLost) {
                     console.log('Connection error, trying to reconnect...');
-                    main();
+                    setTimeout(main, 5000);
                 } else if (raisonDeconnexion === baileys_1.DisconnectReason?.connectionReplaced) {
                     console.log('Connection replaced, another session is open!');
                 } else if (raisonDeconnexion === baileys_1.DisconnectReason.loggedOut) {
                     console.log('Logged out, please rescan QR code!');
                 } else if (raisonDeconnexion === baileys_1.DisconnectReason.restartRequired) {
                     console.log('Restart required...');
-                    main();
+                    setTimeout(main, 5000);
                 } else {
                     console.log('Restarting due to error:', raisonDeconnexion);
-                    exec("pm2 restart all");
+                    setTimeout(main, 5000);
+                    return;
                 }
-                main();
             }
         });
 
@@ -416,7 +416,7 @@ wchannel: https://whatsapp.com/channel/0029Vb7LxhRGE56l9woRjd2g
             }
             let type = await FileType.fromBuffer(buffer);
             let trueFileName = './' + (filename || Date.now().toString()) + '.' + (type?.ext || 'mp4');
-            await fs.writeFileSync(trueFileName, buffer);
+            await fs.writeFile(trueFileName, buffer);
             return trueFileName;
         };
 
@@ -612,25 +612,18 @@ wchannel: https://whatsapp.com/channel/0029Vb7LxhRGE56l9woRjd2g
                 }
             }
 
-            // Chatbot (text only - simplified)
-            if (conf.CHATBOT === "yes" && !ms.key.fromMe && origineMessage !== conf.NUMERO_OWNER + "@s.whatsapp.net") {
+            // Chatbot - only in private chat, not groups, not if command
+            if (conf.CHATBOT === "yes" && !ms.key.fromMe && !verifCom && !verifGroupe) {
                 const messageContent = ms.message?.conversation || ms.message?.extendedTextMessage?.text || "";
-                if (messageContent.trim()) {
+                if (messageContent.trim() && messageContent.length > 2) {
                     try {
-                        let conversationData = [];
-                        try {
-                            const rawData = fs.readFileSync('store.json', 'utf8');
-                            if (rawData) conversationData = JSON.parse(rawData);
-                        } catch (err) {}
-                        
                         const aiResponse = await ai.generate('gpt-4-turbo-2024-04-09', [
                             { role: 'system', content: 'You are SEBASTIAN MD bot. Respond briefly and helpfully.' },
                             { role: 'user', content: messageContent }
                         ]);
-                        
-                        await zk.sendMessage(origineMessage, { text: aiResponse });
+                        if (aiResponse) await zk.sendMessage(origineMessage, { text: aiResponse });
                     } catch (e) {
-                        console.log("Chatbot error:", e);
+                        console.log("Chatbot error:", e.message);
                     }
                 }
             }
@@ -646,7 +639,7 @@ wchannel: https://whatsapp.com/channel/0029Vb7LxhRGE56l9woRjd2g
 
             var idBot = decodeJid(zk.user.id);
             const verifGroupe = origineMessage?.endsWith("@g.us");
-            var infosGroupe = verifGroupe ? await zk.groupMetadata(origineMessage).catch(() => null) : null;
+            var infosGroupe = verifGroupe ? await getGroupMetadata(zk, origineMessage) : null;
             var nomGroupe = infosGroupe?.subject || "";
             var msgRepondu = ms.message.extendedTextMessage?.contextInfo?.quotedMessage;
             var auteurMsgRepondu = decodeJid(ms.message?.extendedTextMessage?.contextInfo?.participant);
