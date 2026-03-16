@@ -1,22 +1,15 @@
-const fs = require('fs-extra');
-const path = require('path');
+// commandes/antilink.js
 
-// Import database functions
 const { 
-    activerAntilien, 
-    desactiverAntilien, 
-    changerAction,
-    recupererActionJid,
+    mettreAJourAction,
+    ajouterOuMettreAJourJid,
     verifierEtatJid,
-    getWarnLimit,
-    setWarnLimit,
-    resetWarnCount,
-    clearAllWarns
+    recupererActionJid
 } = require("../bdd/antilien");
 
-const { getWarnCountByJID, ajouterUtilisateurAvecWarnCount } = require('../bdd/warn');
+const { getWarnCountByJID } = require('../bdd/warn');
 
-module.exports = async (zk, origineMessage, nomCom, arg, repondre, superUser, verifGroupe, verifAdmin, ms) => {
+module.exports = async (zk, origineMessage, nomCom, arg, repondre, superUser, verifGroupe, verifAdmin, ms, auteurMsgRepondu, msgRepondu) => {
     
     // Only work in groups
     if (!verifGroupe) {
@@ -38,22 +31,18 @@ module.exports = async (zk, origineMessage, nomCom, arg, repondre, superUser, ve
             try {
                 const etat = await verifierEtatJid(origineMessage);
                 const action = await recupererActionJid(origineMessage);
-                const warnLimit = await getWarnLimit(origineMessage) || 3;
                 
                 let statusMsg = `╭━━━ *『 ANTI-LINK STATUS 』* ━━━╮\n`;
                 statusMsg += `┃\n`;
                 statusMsg += `┃ 📌 *Group:* ${origineMessage.split('@')[0]}\n`;
                 statusMsg += `┃ ⚡ *Status:* ${etat ? '✅ ACTIVE' : '❌ INACTIVE'}\n`;
-                statusMsg += `┃ 🎯 *Action:* ${action ? action.toUpperCase() : 'DELETE'}\n`;
-                statusMsg += `┃ ⚠️ *Warn Limit:* ${warnLimit}\n`;
+                statusMsg += `┃ 🎯 *Action:* ${action ? action.toUpperCase() : 'SUPP'}\n`;
                 statusMsg += `┃\n`;
                 statusMsg += `┃ *Commands:*\n`;
                 statusMsg += `┃ • ,antilink on - Activate\n`;
                 statusMsg += `┃ • ,antilink off - Deactivate\n`;
-                statusMsg += `┃ • ,antilink action [delete/remove/warn] - Set action\n`;
-                statusMsg += `┃ • ,antilink warnlimit [number] - Set warn limit\n`;
-                statusMsg += `┃ • ,antilink reset - Reset all warns\n`;
-                statusMsg += `┃ • ,antilink clear - Clear warn counts\n`;
+                statusMsg += `┃ • ,antilink action delete/remove/warn - Set action\n`;
+                statusMsg += `┃ • ,antilink status - Check status\n`;
                 statusMsg += `┃\n`;
                 statusMsg += `╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
                 
@@ -65,14 +54,13 @@ module.exports = async (zk, origineMessage, nomCom, arg, repondre, superUser, ve
             return;
         }
 
-        // Handle subcommands
         const subCommand = arg[0].toLowerCase();
 
         // ===== TURN ON =====
         if (subCommand === 'on' || subCommand === 'enable' || subCommand === '1') {
             try {
-                await activerAntilien(origineMessage);
-                const action = await recupererActionJid(origineMessage) || 'delete';
+                await ajouterOuMettreAJourJid(origineMessage, 'oui');
+                const action = await recupererActionJid(origineMessage);
                 repondre(`✅ *ANTI-LINK ACTIVATED*\n\n📌 Group: ${origineMessage.split('@')[0]}\n🎯 Action: ${action.toUpperCase()}\n\nLinks will now be deleted automatically!`);
             } catch (error) {
                 console.log("Antilink on error:", error);
@@ -83,7 +71,7 @@ module.exports = async (zk, origineMessage, nomCom, arg, repondre, superUser, ve
         // ===== TURN OFF =====
         else if (subCommand === 'off' || subCommand === 'disable' || subCommand === '0') {
             try {
-                await desactiverAntilien(origineMessage);
+                await ajouterOuMettreAJourJid(origineMessage, 'non');
                 repondre(`❌ *ANTI-LINK DEACTIVATED*\n\nLinks are now allowed in this group.`);
             } catch (error) {
                 console.log("Antilink off error:", error);
@@ -94,19 +82,25 @@ module.exports = async (zk, origineMessage, nomCom, arg, repondre, superUser, ve
         // ===== SET ACTION =====
         else if (subCommand === 'action' || subCommand === 'act') {
             if (arg.length < 2) {
-                const currentAction = await recupererActionJid(origineMessage) || 'delete';
+                const currentAction = await recupererActionJid(origineMessage);
                 repondre(`🎯 *Current Action:* ${currentAction.toUpperCase()}\n\nAvailable actions:\n• delete - Delete message only\n• remove - Remove user from group\n• warn - Give warning points\n\nUsage: ,antilink action [delete/remove/warn]`);
                 return;
             }
 
             const action = arg[1].toLowerCase();
-            if (!['delete', 'remove', 'warn'].includes(action)) {
+            if (!['delete', 'remove', 'warn', 'supp'].includes(action)) {
                 repondre("❌ Invalid action! Choose: delete, remove, or warn");
                 return;
             }
 
+            // Convert to database format (supp, remove, warn)
+            let dbAction = action;
+            if (action === 'delete') dbAction = 'supp';
+            if (action === 'remove') dbAction = 'remove';
+            if (action === 'warn') dbAction = 'warn';
+
             try {
-                await changerAction(origineMessage, action);
+                await mettreAJourAction(origineMessage, dbAction);
                 repondre(`✅ *ACTION UPDATED*\n\nAntilink will now: ${action.toUpperCase()}`);
             } catch (error) {
                 console.log("Antilink action error:", error);
@@ -114,54 +108,25 @@ module.exports = async (zk, origineMessage, nomCom, arg, repondre, superUser, ve
             }
         }
 
-        // ===== SET WARN LIMIT =====
-        else if (subCommand === 'warnlimit' || subCommand === 'limit' || subCommand === 'warn') {
-            if (arg.length < 2) {
-                const currentLimit = await getWarnLimit(origineMessage) || 3;
-                repondre(`⚠️ *Current Warn Limit:* ${currentLimit}\n\nUsage: ,antilink warnlimit [number]\nExample: ,antilink warnlimit 5`);
-                return;
-            }
-
-            const limit = parseInt(arg[1]);
-            if (isNaN(limit) || limit < 1 || limit > 20) {
-                repondre("❌ Warn limit must be a number between 1 and 20!");
-                return;
-            }
-
+        // ===== STATUS =====
+        else if (subCommand === 'status' || subCommand === 'info') {
             try {
-                await setWarnLimit(origineMessage, limit);
-                repondre(`✅ *WARN LIMIT UPDATED*\n\nNew warn limit: ${limit}\nUsers will be removed after ${limit} warnings.`);
+                const etat = await verifierEtatJid(origineMessage);
+                const action = await recupererActionJid(origineMessage);
+                
+                let statusMsg = `╭━━━ *『 ANTI-LINK INFO 』* ━━━╮\n`;
+                statusMsg += `┃\n`;
+                statusMsg += `┃ 📌 *Group:* ${origineMessage.split('@')[0]}\n`;
+                statusMsg += `┃ ⚡ *Status:* ${etat ? '✅ ACTIVE' : '❌ INACTIVE'}\n`;
+                statusMsg += `┃ 🎯 *Action:* ${action.toUpperCase()}\n`;
+                statusMsg += `┃\n`;
+                statusMsg += `╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+                
+                repondre(statusMsg);
             } catch (error) {
-                console.log("Antilink warnlimit error:", error);
-                repondre("❌ Failed to set warn limit!");
+                console.log("Antilink status error:", error);
+                repondre("❌ Error fetching antilink info!");
             }
-        }
-
-        // ===== RESET ALL WARNS =====
-        else if (subCommand === 'reset' || subCommand === 'resetall') {
-            try {
-                await resetWarnCount(origineMessage);
-                repondre(`✅ *ALL WARNS RESET*\n\nAll warning counts have been cleared for this group.`);
-            } catch (error) {
-                console.log("Antilink reset error:", error);
-                repondre("❌ Failed to reset warns!");
-            }
-        }
-
-        // ===== CLEAR WARNS =====
-        else if (subCommand === 'clear' || subCommand === 'clearall') {
-            try {
-                await clearAllWarns(origineMessage);
-                repondre(`✅ *ALL WARNS CLEARED*\n\nAll warning data has been cleared for this group.`);
-            } catch (error) {
-                console.log("Antilink clear error:", error);
-                repondre("❌ Failed to clear warns!");
-            }
-        }
-
-        // ===== SHOW WARNS =====
-        else if (subCommand === 'warns' || subCommand === 'list') {
-            repondre("📝 Use ,warn @user to check individual warnings");
         }
 
         // ===== HELP =====
@@ -181,50 +146,18 @@ module.exports = async (zk, origineMessage, nomCom, arg, repondre, superUser, ve
 ┃    ,antilink action remove
 ┃    ,antilink action warn
 ┃
-┃ 4️⃣ *Set Warn Limit:*
-┃    ,antilink warnlimit 5
-┃
-┃ 5️⃣ *Reset Warns:*
-┃    ,antilink reset
-┃
-┃ 6️⃣ *Check Status:*
+┃ 4️⃣ *Check Status:*
 ┃    ,antilink
 ┃    ,antilink status
 ┃
-┃ 7️⃣ *Check Warns:*
+┃ 5️⃣ *Check Warns:*
 ┃    ,warn @user
-┃
-┃ 8️⃣ *Remove Warn:*
-┃    ,delwarn @user
 ┃
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
             repondre(helpMsg);
         }
 
-        // ===== STATUS =====
-        else if (subCommand === 'status' || subCommand === 'info') {
-            try {
-                const etat = await verifierEtatJid(origineMessage);
-                const action = await recupererActionJid(origineMessage) || 'delete';
-                const warnLimit = await getWarnLimit(origineMessage) || 3;
-                
-                let statusMsg = `╭━━━ *『 ANTI-LINK INFO 』* ━━━╮\n`;
-                statusMsg += `┃\n`;
-                statusMsg += `┃ 📌 *Group:* ${origineMessage.split('@')[0]}\n`;
-                statusMsg += `┃ ⚡ *Status:* ${etat ? '✅ ACTIVE' : '❌ INACTIVE'}\n`;
-                statusMsg += `┃ 🎯 *Action:* ${action.toUpperCase()}\n`;
-                statusMsg += `┃ ⚠️ *Warn Limit:* ${warnLimit}\n`;
-                statusMsg += `┃\n`;
-                statusMsg += `╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
-                
-                repondre(statusMsg);
-            } catch (error) {
-                console.log("Antilink status error:", error);
-                repondre("❌ Error fetching antilink info!");
-            }
-        }
-
-        // ===== UNKNOWN COMMAND =====
+        // ===== UNKNOWN =====
         else {
             repondre(`❌ Unknown command: ${subCommand}\n\nUse ,antilink help to see available commands.`);
         }
@@ -233,7 +166,6 @@ module.exports = async (zk, origineMessage, nomCom, arg, repondre, superUser, ve
     // ===== WARN COMMAND =====
     else if (nomCom === 'warn') {
         if (!arg || arg.length === 0) {
-            // Show warns for all users or current user
             repondre("Usage: ,warn @user  - Check warnings for a user\nExample: ,warn @255712345678");
             return;
         }
@@ -255,53 +187,13 @@ module.exports = async (zk, origineMessage, nomCom, arg, repondre, superUser, ve
         }
 
         try {
-            const warnCount = await getWarnCountByJID(targetUser);
-            const warnLimit = await getWarnLimit(origineMessage) || 3;
+            const warnCount = await getWarnCountByJID(targetUser) || 0;
+            const warnLimit = 3; // Default warn limit
             
             repondre(`⚠️ *WARN INFO*\n\n👤 User: @${targetUser.split('@')[0]}\n📊 Warnings: ${warnCount}/${warnLimit}\n\n${warnCount >= warnLimit ? '❌ User has reached warn limit!' : '✅ User is within limit.'}`);
         } catch (error) {
             console.log("Warn check error:", error);
             repondre("❌ Error checking warnings!");
-        }
-    }
-
-    // ===== DELWARN COMMAND =====
-    else if (nomCom === 'delwarn' || nomCom === 'removewarn') {
-        if (!verifAdmin && !superUser) {
-            repondre("❌ Only admins can remove warnings!");
-            return;
-        }
-
-        if (!arg || arg.length === 0) {
-            repondre("Usage: ,delwarn @user  - Remove warnings for a user\nExample: ,delwarn @255712345678");
-            return;
-        }
-
-        // Extract mentioned user
-        let targetUser = null;
-        if (ms.message.extendedTextMessage?.contextInfo?.mentionedJid) {
-            targetUser = ms.message.extendedTextMessage.contextInfo.mentionedJid[0];
-        } else if (msgRepondu) {
-            targetUser = auteurMsgRepondu;
-        } else if (arg[0].startsWith('@')) {
-            const number = arg[0].replace('@', '') + '@s.whatsapp.net';
-            targetUser = number;
-        }
-
-        if (!targetUser) {
-            repondre("❌ Please mention the user or reply to their message!");
-            return;
-        }
-
-        try {
-            // Import the remove function
-            const { removeUserFromWarnList } = require('../bdd/warn');
-            await removeUserFromWarnList(targetUser);
-            
-            repondre(`✅ *WARN REMOVED*\n\nWarnings for @${targetUser.split('@')[0]} have been cleared.`);
-        } catch (error) {
-            console.log("Delwarn error:", error);
-            repondre("❌ Error removing warnings!");
         }
     }
 };
