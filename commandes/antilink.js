@@ -1,16 +1,16 @@
+const zokou = require("../framework/zokou");
 const { 
     mettreAJourAction,
     ajouterOuMettreAJourJid,
     verifierEtatJid,
     recupererActionJid
 } = require("../bdd/antilien");
-
 const { getWarnCountByJID } = require('../bdd/warn');
 
-module.exports = {
-    nomCom: 'antilink', // JINA LA COMMAND
-    categorie: 'Admin',
-    reaction: '🔗',
+zokou({
+    nomCom: "antilink",
+    categorie: "Admin",
+    reaction: "🔗",
     fonction: async (origineMessage, zk, options) => {
         
         const { repondre, arg, verifAdmin, superUser, verifGroupe, ms, auteurMsgRepondu, msgRepondu } = options;
@@ -27,7 +27,7 @@ module.exports = {
             return;
         }
 
-        // No arguments - show status
+        // ===== SHOW STATUS (no arguments) =====
         if (!arg || arg.length === 0) {
             try {
                 const etat = await verifierEtatJid(origineMessage);
@@ -158,4 +158,4 @@ module.exports = {
             repondre(`❌ Unknown command: ${subCommand}\n\nUse ,antilink help to see available commands.`);
         }
     }
-};
+});
