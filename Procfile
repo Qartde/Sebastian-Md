@@ -1,0 +1,2 @@
+
+worker: node seba.js 
