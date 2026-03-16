@@ -1,11 +1,10 @@
 const zokou = require("../framework/zokou");
 const { 
-    mettreAJourAction,
+    verifierEtatJid, 
+    recupererActionJid,
     ajouterOuMettreAJourJid,
-    verifierEtatJid,
-    recupererActionJid
+    mettreAJourAction
 } = require("../bdd/antilien");
-const { getWarnCountByJID } = require('../bdd/warn');
 
 zokou({
     nomCom: "antilink",
@@ -13,149 +12,138 @@ zokou({
     reaction: "🔗",
     fonction: async (origineMessage, zk, options) => {
         
-        const { repondre, arg, verifAdmin, superUser, verifGroupe, ms, auteurMsgRepondu, msgRepondu } = options;
+        const { repondre, arg, verifAdmin, superUser, verifGroupe } = options;
         
-        // Only work in groups
+        // RUDISHA UIOWEKE KWA AJILI YA DEBUG
+        console.log("========== ANTILINK COMMAND EXECUTED ==========");
+        console.log("Group:", verifGroupe);
+        console.log("Admin:", verifAdmin);
+        console.log("SuperUser:", superUser);
+        console.log("Arguments:", arg);
+        
         if (!verifGroupe) {
-            repondre("❌ This command can only be used in groups!");
+            repondre("❌ Command hii inatumika kwenye group pekee!");
             return;
         }
 
-        // Check if user is admin
         if (!verifAdmin && !superUser) {
-            repondre("❌ Only group admins can use this command!");
+            repondre("❌ Command hii ni ya admins pekee!");
             return;
         }
 
-        // ===== SHOW STATUS (no arguments) =====
+        // HAKUNA ARGUMENTS - ONYESHA STATUS
         if (!arg || arg.length === 0) {
             try {
                 const etat = await verifierEtatJid(origineMessage);
                 const action = await recupererActionJid(origineMessage);
                 
-                let statusMsg = `╭━━━ *『 ANTI-LINK STATUS 』* ━━━╮\n`;
-                statusMsg += `┃\n`;
-                statusMsg += `┃ 📌 *Group:* ${origineMessage.split('@')[0]}\n`;
-                statusMsg += `┃ ⚡ *Status:* ${etat ? '✅ ACTIVE' : '❌ INACTIVE'}\n`;
-                statusMsg += `┃ 🎯 *Action:* ${action ? action.toUpperCase() : 'SUPP'}\n`;
-                statusMsg += `┃\n`;
-                statusMsg += `┃ *Commands:*\n`;
-                statusMsg += `┃ • ,antilink on - Activate\n`;
-                statusMsg += `┃ • ,antilink off - Deactivate\n`;
-                statusMsg += `┃ • ,antilink action delete - Delete only\n`;
-                statusMsg += `┃ • ,antilink action remove - Remove user\n`;
-                statusMsg += `┃ • ,antilink action warn - Warn user\n`;
-                statusMsg += `┃ • ,antilink status - Check status\n`;
-                statusMsg += `┃\n`;
-                statusMsg += `╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+                let status = etat ? "✅ IMEWASHWA" : "❌ IMEZIMWA";
+                let act = action === 'supp' ? 'FUTA' : action === 'remove' ? 'TOA' : 'ONYA';
                 
-                repondre(statusMsg);
-            } catch (error) {
-                console.log("Antilink status error:", error);
-                repondre("❌ Error fetching antilink status!");
+                repondre(`*⚙️ ANTI-LINK STATUS*
+                
+📌 Group: ${origineMessage.split('@')[0]}
+⚡ Hali: ${status}
+🎯 Action: ${act}
+
+*Commands:*
+• ,antilink on - Washa
+• ,antilink off - Zima
+• ,antilink action delete - Futa tu
+• ,antilink action remove - Toa member
+• ,antilink action warn - Onya
+• ,antilink status - Angalia tena`);
+                
+            } catch (e) {
+                console.log("Error:", e);
+                repondre("❌ Error: " + e.message);
             }
             return;
         }
 
-        const subCommand = arg[0].toLowerCase();
+        const cmd = arg[0].toLowerCase();
 
-        // ===== TURN ON =====
-        if (subCommand === 'on' || subCommand === 'enable') {
+        // WASHA
+        if (cmd === 'on') {
             try {
                 await ajouterOuMettreAJourJid(origineMessage, 'oui');
-                const action = await recupererActionJid(origineMessage);
-                repondre(`✅ *ANTI-LINK ACTIVATED*\n\n📌 Group: ${origineMessage.split('@')[0]}\n🎯 Action: ${action.toUpperCase()}\n\nLinks will now be monitored!`);
-            } catch (error) {
-                console.log("Antilink on error:", error);
-                repondre("❌ Failed to activate antilink!");
+                repondre("✅ *ANTI-LINK IMEWASHWA*");
+            } catch (e) {
+                repondre("❌ Error: " + e.message);
             }
         }
-
-        // ===== TURN OFF =====
-        else if (subCommand === 'off' || subCommand === 'disable') {
+        
+        // ZIMA
+        else if (cmd === 'off') {
             try {
                 await ajouterOuMettreAJourJid(origineMessage, 'non');
-                repondre(`❌ *ANTI-LINK DEACTIVATED*\n\nLinks are now allowed in this group.`);
-            } catch (error) {
-                console.log("Antilink off error:", error);
-                repondre("❌ Failed to deactivate antilink!");
+                repondre("❌ *ANTI-LINK IMEZIMWA*");
+            } catch (e) {
+                repondre("❌ Error: " + e.message);
             }
         }
-
-        // ===== SET ACTION =====
-        else if (subCommand === 'action') {
+        
+        // BADILISHA ACTION
+        else if (cmd === 'action') {
             if (arg.length < 2) {
-                const currentAction = await recupererActionJid(origineMessage);
-                repondre(`🎯 *Current Action:* ${currentAction.toUpperCase()}\n\nAvailable actions:\n• delete - Delete message only\n• remove - Remove user from group\n• warn - Give warning points\n\nUsage: ,antilink action [delete/remove/warn]`);
+                repondre("Tafadhali chagua: delete, remove, au warn");
                 return;
             }
-
-            const action = arg[1].toLowerCase();
             
-            // Map user-friendly names to database values
-            let dbAction;
+            const action = arg[1].toLowerCase();
+            let dbAction = 'supp';
+            
             if (action === 'delete') dbAction = 'supp';
             else if (action === 'remove') dbAction = 'remove';
             else if (action === 'warn') dbAction = 'warn';
             else {
-                repondre("❌ Invalid action! Choose: delete, remove, or warn");
+                repondre("Action si sahihi. Tumia: delete, remove, au warn");
                 return;
             }
-
+            
             try {
                 await mettreAJourAction(origineMessage, dbAction);
-                repondre(`✅ *ACTION UPDATED*\n\nAntilink will now: ${action.toUpperCase()}`);
-            } catch (error) {
-                console.log("Antilink action error:", error);
-                repondre("❌ Failed to update action!");
+                repondre(`✅ Action imebadilishwa kuwa: *${action.toUpperCase()}*`);
+            } catch (e) {
+                repondre("❌ Error: " + e.message);
             }
         }
-
-        // ===== STATUS =====
-        else if (subCommand === 'status' || subCommand === 'info') {
+        
+        // STATUS
+        else if (cmd === 'status') {
             try {
                 const etat = await verifierEtatJid(origineMessage);
                 const action = await recupererActionJid(origineMessage);
                 
-                let statusMsg = `╭━━━ *『 ANTI-LINK INFO 』* ━━━╮\n`;
-                statusMsg += `┃\n`;
-                statusMsg += `┃ 📌 *Group:* ${origineMessage.split('@')[0]}\n`;
-                statusMsg += `┃ ⚡ *Status:* ${etat ? '✅ ACTIVE' : '❌ INACTIVE'}\n`;
-                statusMsg += `┃ 🎯 *Action:* ${action.toUpperCase()}\n`;
-                statusMsg += `┃\n`;
-                statusMsg += `╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
+                let status = etat ? "✅ IMEWASHWA" : "❌ IMEZIMWA";
+                let act = action === 'supp' ? 'FUTA' : action === 'remove' ? 'TOA' : 'ONYA';
                 
-                repondre(statusMsg);
-            } catch (error) {
-                console.log("Antilink status error:", error);
-                repondre("❌ Error fetching antilink info!");
+                repondre(`*⚙️ ANTI-LINK STATUS*
+                
+📌 Group: ${origineMessage.split('@')[0]}
+⚡ Hali: ${status}
+🎯 Action: ${act}`);
+                
+            } catch (e) {
+                repondre("❌ Error: " + e.message);
             }
         }
+        
+        // HELP
+        else if (cmd === 'help') {
+            repondre(`*🔗 ANTI-LINK HELP*
 
-        // ===== HELP =====
-        else if (subCommand === 'help') {
-            const helpMsg = `╭━━━ *『 ANTI-LINK HELP 』* ━━━╮
-┃
-┃ *Commands:*
-┃
-┃ 🔹 *Activate:* ,antilink on
-┃ 🔹 *Deactivate:* ,antilink off
-┃ 🔹 *Set Action:* ,antilink action [delete/remove/warn]
-┃ 🔹 *Check Status:* ,antilink
-┃ 🔹 *Check Warns:* ,warn @user
-┃
-┃ *Actions:*
-┃ • delete - Delete message only
-┃ • remove - Remove user from group
-┃ • warn - Give warning points
-┃
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`;
-            repondre(helpMsg);
+,antilink - Angalia status
+,antilink on - Washa
+,antilink off - Zima
+,antilink action delete - Futa tu
+,antilink action remove - Toa member
+,antilink action warn - Onya
+,antilink status - Angalia status`);
         }
-
-        // ===== UNKNOWN =====
+        
         else {
-            repondre(`❌ Unknown command: ${subCommand}\n\nUse ,antilink help to see available commands.`);
+            repondre("Command haitambuliki. Tuma ,antilink help");
         }
     }
 });
