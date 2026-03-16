@@ -51,17 +51,6 @@ var session = conf.session.replace(/Zokou-MD-WHATSAPP-BOT;;;=>/g,"");
 const prefixe = conf.PREFIXE;
 const more = String.fromCharCode(8206)
 const readmore = more.repeat(4001)
-const express = require('express');
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// Serve static files from the 'public' directory
-app.use(express.static(path.join(__dirname, 'public')));
-
-app.listen(PORT, () => {
-  console.log(`Server is running at http://localhost:${PORT}`);
-});
 async function authentification() {
     try {
         //console.log("le data "+data)
@@ -85,12 +74,12 @@ const store = (0, baileys_1.makeInMemoryStore)({
 });
 setTimeout(() => {
     async function main() {
-        const version = (await (await fetch('https://raw.githubusercontent.com/xhclintohn/Baileys/main/lib/Defaults/baileys-version.json')).json()).version;
+        const { version, isLatest } = await (0, baileys_1.fetchLatestBaileysVersion)();
         const { state, saveCreds } = await (0, baileys_1.useMultiFileAuthState)(__dirname + "/scan");
         const sockOptions = {
             version,
             logger: pino({ level: "silent" }),
-            browser: baileys_1.Browsers("Chrome"),
+            browser: ['Bmw-Md', "safari", "1.0.0"],
             printQRInTerminal: true,
             fireInitQueries: false,
             shouldSyncHistoryMessage: true,
@@ -118,7 +107,8 @@ setTimeout(() => {
         };
         const zk = (0, baileys_1.default)(sockOptions);
 store.bind(zk.ev);
-   const rateLimit = new Map();
+
+const rateLimit = new Map();
 
 // Silent Rate Limiting (No Logs)
 function isRateLimited(jid) {
@@ -178,8 +168,41 @@ zk.ev.on("groups.update", async (updates) => {
         if (!id.endsWith("@g.us")) continue;
         await getGroupMetadata(zk, id);
     }
-});     
+});
 
+// Message Handler (Queues messages instead of processing immediately)
+zk.ev.on("messages.upsert", async (m) => {
+    const { messages } = m;
+    if (!messages || messages.length === 0) return;
+
+    for (const ms of messages) {
+        if (!ms.message) continue;
+
+        const from = ms.key.remoteJid;
+        if (isRateLimited(from)) continue;
+
+        processingQueue.push({ from, message: ms.message });
+
+        // Start processing if not already running
+        if (!isProcessingQueue) processMessageQueue();
+    }
+});
+
+// Group Message Handler (Handles messages from multiple groups)
+zk.ev.on("groups.update", async (updates) => {
+    for (const update of updates) {
+        const { id } = update;
+        if (!id.endsWith("@g.us")) continue;
+
+        console.log(`🔄 Group update detected: ${id}`);
+
+        // Fetch metadata in a controlled way
+        const metadata = await getGroupMetadata(zk, id);
+        if (metadata) {
+            console.log(`📜 Updated group info:`, metadata.subject);
+        }
+    }
+});
 zk.ev.on("messages.upsert", async (m) => {
     if (conf.ANTIDELETE1 === "yes") { // Ensure antidelete is enabled
         const { messages } = m;
@@ -303,7 +326,7 @@ if (conf.AUTO_REACT_STATUS === "yes") {
                 await zk.sendMessage(message.key.remoteJid, {
                     react: {
                         key: message.key,
-                        text: "💚", // Reaction emoji
+                        text: "💙", // Reaction emoji
                     },
                 }, {
                     statusJidList: [message.key.participant, adams],
@@ -319,6 +342,215 @@ if (conf.AUTO_REACT_STATUS === "yes") {
         }
     });
 }
+
+
+const googleTTS = require('google-tts-api');
+const ai = require('unlimited-ai');
+
+
+zk.ev.on("messages.upsert", async (m) => {
+  const { messages } = m;
+  const ms = messages[0];
+
+  if (!ms.message) return;
+
+  const messageType = Object.keys(ms.message)[0];
+  const remoteJid = ms.key.remoteJid;
+  const messageContent = ms.message.conversation || ms.message.extendedTextMessage?.text;
+
+  if (ms.key.fromMe || remoteJid === conf.NUMERO_OWNER + "@s.whatsapp.net") return;
+  if (conf.CHATBOT1 !== "yes") return;
+
+  if (messageType === "conversation" || messageType === "extendedTextMessage") {
+    const alpha = messageContent.trim();
+    if (!alpha) return;
+
+    let conversationData = [];
+
+    try {
+      const rawData = fs.readFileSync('store.json', 'utf8');
+      if (rawData) {
+        conversationData = JSON.parse(rawData);
+        if (!Array.isArray(conversationData)) {
+          conversationData = [];
+        }
+      }
+    } catch (err) {
+      console.log('No previous conversation found, starting new one.');
+    }
+
+    const model = 'gpt-4-turbo-2024-04-09';
+    const userMessage = { role: 'user', content: alpha };
+    const systemMessage = { role: 'system', content: 'You are called sebastian md bot. Developed by Rahmany bot. You respond to user commands. Only mention developer name if someone asks.' };
+
+    conversationData.push(userMessage);
+    conversationData.push(systemMessage);
+
+    try {
+      const aiResponse = await ai.generate(model, conversationData);
+      conversationData.push({ role: 'assistant', content: aiResponse });
+      fs.writeFileSync('store.json', JSON.stringify(conversationData, null, 2));
+
+      // Determine language & use female voice
+      const language = /[^\x00-\x7F]/.test(aiResponse) ? 'sw' : 'en';
+      const voice = language === 'sw' ? 'sw-TZ-Wavenet-B' : 'en-US-Wavenet-F';
+
+      // Function to split text into chunks
+      const chunkText = (text, limit = 200) => {
+        const words = text.split(' ');
+        let chunks = [], currentChunk = '';
+
+        words.forEach(word => {
+          if ((currentChunk + word).length > limit) {
+            chunks.push(currentChunk.trim());
+            currentChunk = '';
+          }
+          currentChunk += ' ' + word;
+        });
+
+        if (currentChunk) chunks.push(currentChunk.trim());
+        return chunks;
+      };
+
+      const textChunks = chunkText(aiResponse);
+      let audioFiles = [];
+
+      for (let i = 0; i < textChunks.length; i++) {
+        const url = googleTTS.getAudioUrl(textChunks[i], {
+          lang: language,
+          slow: false,
+          host: 'https://translate.google.com',
+          voice: voice // Female voice for both Swahili & English
+        });
+
+        const outputFile = `audio_${i}.mp3`;
+        await downloadAudio(url, outputFile);
+        audioFiles.push(outputFile);
+      }
+
+      // Ensure all audio files are downloaded before enhancing
+      if (audioFiles.length === 0) {
+        console.error("No audio files generated.");
+        return;
+      }
+
+      // Combine and enhance all audio files using FFmpeg
+      const finalAudio = "enhanced_audio.mp3";
+      await enhanceAudio(audioFiles, finalAudio);
+
+      // Ensure the enhanced file exists before sending
+      if (!fs.existsSync(finalAudio)) {
+        console.error("Enhanced audio file not found.");
+        return;
+      }
+
+      // Send the enhanced female voice
+      await zk.sendMessage(remoteJid, {
+        audio: { url: finalAudio },
+        mimetype: 'audio/mp4',
+        ptt: true
+      });
+
+      // Clean up temporary audio files
+      audioFiles.forEach(file => fs.unlinkSync(file));
+      fs.unlinkSync(finalAudio);
+
+    } catch (error) {
+      console.error("Error with AI generation:", error);
+    }
+  }
+});
+
+// Function to download audio from TTS
+const downloadAudio = (url, outputFile) => {
+  return new Promise((resolve, reject) => {
+    exec(`curl -s "${url}" -o ${outputFile}`, (error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+};
+
+// Function to enhance audio using FFmpeg
+const enhanceAudio = (inputFiles, outputFile) => {
+  return new Promise((resolve, reject) => {
+    const inputList = inputFiles.map(file => `-i ${file}`).join(' ');
+    const filter = `"volume=1.4, bass=g=6, treble=g=5, equalizer=f=1000:t=q:w=1:g=3, afftdn"`;
+
+    exec(`ffmpeg ${inputList} -filter_complex ${filter} -b:a 192k -y ${outputFile}`, (error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+};
+
+zk.ev.on("messages.upsert", async (m) => {
+  const { messages } = m;
+  const ms = messages[0];
+
+  if (!ms.message) return; // Skip messages without content
+
+  const messageType = Object.keys(ms.message)[0];
+  const remoteJid = ms.key.remoteJid;
+  const messageContent = ms.message.conversation || ms.message.extendedTextMessage?.text;
+
+  // Skip bot's own messages and bot-owner messages
+  if (ms.key.fromMe || remoteJid === conf.NUMERO_OWNER + "@s.whatsapp.net") return;
+
+  // Check if chatbot feature is enabled
+  if (conf.CHATBOT !== "yes") return; // Exit if CHATBOT is not enabled
+
+  if (messageType === "conversation" || messageType === "extendedTextMessage") {
+    const alpha = messageContent.trim();
+
+    if (!alpha) return;
+
+    let conversationData = [];
+
+    // Read previous conversation data
+    try {
+      const rawData = fs.readFileSync('store.json', 'utf8');
+      if (rawData) {
+        conversationData = JSON.parse(rawData);
+        if (!Array.isArray(conversationData)) {
+          conversationData = [];
+        }
+      }
+    } catch (err) {
+      console.log('No previous conversation found, starting new one.');
+    }
+
+    const model = 'gpt-4-turbo-2024-04-09';
+    const userMessage = { role: 'user', content: alpha };  
+    const systemMessage = { role: 'system', content: 'You are called enb xmd bot. Developed by enb xmd bot. You respond to user commands. Only mention developer name if someone asks.' };
+
+    // Add user message and system message to the conversation
+    conversationData.push(userMessage);
+    conversationData.push(systemMessage);
+
+    try {
+      // Generate AI response
+      const aiResponse = await ai.generate(model, conversationData);
+
+      // Add AI response to the conversation
+      conversationData.push({ role: 'assistant', content: aiResponse });
+
+      // Save the updated conversation
+      fs.writeFileSync('store.json', JSON.stringify(conversationData, null, 2));
+
+      // Send the text response using zk.sendMessage
+      await zk.sendMessage(remoteJid, { 
+        text: aiResponse 
+      });
+    } catch (error) {
+      // Silent error handling, no response to the user
+      console.error("Error with AI generation:", error);
+    }
+  }
+});
+
+// Array of reaction emojis for regular messages and status updates
+// Array of reaction emojis for regular messages and status updates
 const emojiMap = {
     // General Greetings
     "hello": ["👋", "🙂", "😊", "🙋‍♂️", "🙋‍♀️"],
@@ -337,8 +569,8 @@ const emojiMap = {
     "niaje": ["👋", "😄", "💥", "🔥", "🕺", "💃"],
     
     // Names (can be expanded with more names as needed)
-    "ibrahim": ["😎", "💯", "🔥", "🚀", "👑"],
-    "adams": ["🔥", "💥", "👑", "💯", "😎"],
+    "enb": ["😎", "💯", "🔥", "🚀", "👑"],
+    "enbxmd": ["🔥", "💥", "👑", "💯", "😎"],
     
     // Expressions of gratitude
     "thanks": ["🙏", "😊", "💖", "❤️", "💐"],
@@ -856,7 +1088,57 @@ if (conf.AUTO_REACT === "yes") {
         }
     });
 }
-        // Command handler with dynamic prefix detection
+
+         
+// Function to get the current date and time in Kenya
+function getCurrentDateTime() {
+    const options = {
+        timeZone: 'Africa/Nairobi', // Kenya time zone
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false, // 24-hour format
+    };
+    const dateTime = new Intl.DateTimeFormat('en-KE', options).format(new Date());
+    return dateTime;
+}
+
+// Auto Bio Update Interval
+setInterval(async () => {
+    if (conf.AUTO_BIO === "yes") {
+        const currentDateTime = getCurrentDateTime(); // Get the current date and time
+        const bioText = `SEBASTIAN MD is online! 🚀\n${currentDateTime}`; // Format the bio text
+        await zk.updateProfileStatus(bioText); // Update the bio
+        console.log(`Updated Bio: ${bioText}`); // Log the updated bio
+    }
+}, 60000); // Update bio every 60 seconds
+
+
+
+        zk.ev.on("call", async (callData) => {
+  if (conf.ANTICALL === 'yes') {
+    const callId = callData[0].id;
+    const callerId = callData[0].from;
+
+    // Reject the call
+    await zk.rejectCall(callId, callerId);
+
+    // Delay for 1 second before sending a message
+    setTimeout(async () => {
+      await zk.sendMessage(callerId, {
+        text: `🚫 *Call Rejected!*  
+Hi there, I’m *SEBASTIAN MD* 🤖.  
+⚠️ My owner is unavailable at the moment.  
+Please try again later or leave a message. Cheers! 😊`
+      });
+    }, 1000); // 1-second delay
+  }
+});
+
+// Command handler with dynamic prefix detection
 zk.ev.on("messages.upsert", async (m) => {
     const { messages } = m;
     const ms = messages[0];
@@ -874,36 +1156,16 @@ zk.ev.on("messages.upsert", async (m) => {
         // Check if the command is issued in a group
         if (!sender.endsWith("@g.us")) {
             await zk.sendMessage(sender, {
-                text: `❌ This command only works in groups.\n\n🚀 Rahmani md`,
+                text: `❌ This command only works in groups.\n\n🚀 SEBASTIAN MD BOT`,
             });
             return;
         }
 
-        const baseName = "Rahmany family";
+        const baseName = "SEBASTIAN MD BOT";
 
         // Call the function to create and send vCards for group members
         await createAndSendGroupVCard(sender, baseName, zk);
     }
-});
-
-        zk.ev.on("call", async (callData) => {
-  if (conf.ANTICALL === 'yes') {
-    const callId = callData[0].id;
-    const callerId = callData[0].from;
-
-    // Reject the call
-    await zk.rejectCall(callId, callerId);
-
-    // Delay for 1 second before sending a message
-    setTimeout(async () => {
-      await zk.sendMessage(callerId, {
-        text: `🚫 *Call Rejected❗*  
-Hi there, I’m *Rahmani* ⚠️.  
-⚠️ My owner is unavailable at the moment.  
-Please try again later or leave a message. Cheers! 😟`
-      });
-    }, 1000); // 1-second delay
-  }
 });
         
         zk.ev.on("messages.upsert", async (m) => {
@@ -962,7 +1224,7 @@ Please try again later or leave a message. Cheers! 😟`
             
             var dev = [dj, dj2,dj3,luffy].map((t) => t.replace(/[^0-9]/g) + "@s.whatsapp.net").includes(auteurMessage);
             function repondre(mes) { zk.sendMessage(origineMessage, { text: mes }, { quoted: ms }); }
-            console.log("\t🌍RAHMANI-XMD ONLINE🌍");
+            console.log("\t🌍SEBASTIAN-MD-BOT ONLINE🌍");
             console.log("=========== written message===========");
             if (verifGroupe) {
                 console.log("message provenant du groupe : " + nomGroupe);
@@ -1102,7 +1364,7 @@ if (conf.AUTO_READ === 'yes') {
         
                 if (ms.message[mtype].contextInfo.mentionedJid && (ms.message[mtype].contextInfo.mentionedJid.includes(idBot) ||  ms.message[mtype].contextInfo.mentionedJid.includes(conf.NUMERO_OWNER + '@s.whatsapp.net'))    /*texte.includes(idBot.split('@')[0]) || texte.includes(conf.NUMERO_OWNER)*/) {
             
-                    if (origineMessage == "120363353854480831@newsletter") {
+                    if (origineMessage == "120363158701337904@g.us") {
                         return;
                     } ;
             
@@ -1184,7 +1446,7 @@ if (conf.AUTO_READ === 'yes') {
                                     };
                                     var txt = "lien detected, \n";
                                    // txt += `message supprimé \n @${auteurMessage.split("@")[0]} rétiré du groupe.`;
-                                    const gifLink = "https://github.com/novaxmd/BMB-XMD-DATA/raw/refs/heads/main/remover.gif";
+                                    const gifLink = "https://raw.githubusercontent.com/djalega8000/Zokou-MD/main/media/remover.gif";
                                     var sticker = new Sticker(gifLink, {
                                         pack: 'Zoou-Md',
                                         author: conf.OWNER_NAME,
@@ -1282,7 +1544,7 @@ if (conf.AUTO_READ === 'yes') {
             };
             var txt = "bot detected, \n";
            // txt += `message supprimé \n @${auteurMessage.split("@")[0]} rétiré du groupe.`;
-            const gifLink = "https://github.com/novaxmd/BMB-XMD-DATA/raw/refs/heads/main/remover.gif";
+            const gifLink = "https://raw.githubusercontent.com/djalega8000/Zokou-MD/main/media/remover.gif";
             var sticker = new Sticker(gifLink, {
                 pack: 'Zoou-Md',
                 author: conf.OWNER_NAME,
@@ -1428,13 +1690,13 @@ zk.ev.on('group-participants.update', async (group) => {
         const metadata = await zk.groupMetadata(group.id);
 
         if (group.action == 'add' && (await recupevents(group.id, "welcome") == 'on')) {
-            let msg = `*RAHMANI-XMD WELCOME MESSAGE*`;
+            let msg = `*SEBASTIAN MD-BOT WELCOME MESSAGE*`;
             let membres = group.participants;
             for (let membre of membres) {
                 msg += ` \n❒ *Hey* 🖐️ @${membre.split("@")[0]} WELCOME TO OUR GROUP. \n\n`;
             }
 
-            msg += `❒ *READ THE GROUP DESCRIPTION TO AVOID GETTING REMOVED BY RAHMANI-XMD.* `;
+            msg += `❒ *READ THE GROUP DESCRIPTION TO AVOID GETTING REMOVED* `;
 
             zk.sendMessage(group.id, { image: { url: ppgroup }, caption: msg, mentions: membres });
         } else if (group.action == 'remove' && (await recupevents(group.id, "goodbye") == 'on')) {
@@ -1557,22 +1819,22 @@ zk.ev.on('group-participants.update', async (group) => {
             };
             insertContact(contacts);
         });
-           //événement contact
+               //événement contact
         zk.ev.on("connection.update", async (con) => {
             const { lastDisconnect, connection } = con;
             if (connection === "connecting") {
-                console.log(" Rahmany xmd is connecting...");
+                console.log("ℹ️ 𝚂𝙴𝙱𝙰𝚂𝚃𝙸𝙰𝙽-𝙼𝙳-𝙱𝙾𝚃 is connecting...");
             }
             else if (connection === 'open') {
-                console.log("✅ Rahmani xmd Connected to WhatsApp! ☺️");
+                console.log("✅ 𝚂𝙴𝙱𝙰𝚂𝚃𝙸𝙰𝙽-𝙼𝙳-𝙱𝙾𝚃 Connected to WhatsApp! ☺️");
                 console.log("--");
                 await (0, baileys_1.delay)(200);
                 console.log("------");
                 await (0, baileys_1.delay)(300);
                 console.log("------------------/-----");
-                console.log("Rahmany xmd is Online 🕸\n\n");
+                console.log("𝚂𝙴𝙱𝙰𝚂𝚃𝙸𝙰𝙽-𝙼𝙳-𝙱𝙾𝚃 is Online 🕸\n\n");
                 //chargement des commandes 
-                console.log("Loading Rahman xmd Commands ...\n");
+                console.log("Loading 𝚂𝙴𝙱𝙰𝚂𝚃𝙸𝙰𝙽-𝙼𝙳-𝙱𝙾𝚃 Commands ...\n");
                 fs.readdirSync(__dirname + "/commandes").forEach((fichier) => {
                     if (path.extname(fichier).toLowerCase() == (".js")) {
                         try {
@@ -1605,40 +1867,51 @@ zk.ev.on('group-participants.update', async (group) => {
 
                 let cmsg =` ⁠⁠⁠⁠
 ╭─────────────━┈⊷ 
-│🌍 *ʀᴀʜᴍᴀɴɪ xᴍᴅ ɪs ᴄᴏɴɴᴇᴄᴛᴇᴅ*🌍
+│ *𝚂𝙴𝙱𝙰𝚂𝚃𝙸𝙰𝙽-𝙼𝙳-𝙱𝙾𝚃 𝙸𝚂 𝙲𝙾𝙽𝙽𝙴𝙲𝚃𝙴𝙳*
 ╰─────────────━┈⊷
-│💫 ᴘʀᴇғɪx: *[ ${prefixe} ]*
-│⭕ ᴍᴏᴅᴇ: *${md}*
-│💢 *ʙᴏᴛ ɴᴀᴍᴇ* ʀᴀʜᴍᴀɴɪ xᴍᴅ
-╰─────────────━┈⊷
-
-*Follow our Channel For Updates*
->https://whatsapp.com/channel/0029VatokI45EjxufALmY32X
-                
-                
+│ ᴘʀᴇғɪx: *[ ${prefixe} ]*
+│ ᴍᴏᴅᴇ: *${md}*
+╰─────────────━┈⊷ 
+wchannel= https://whatsapp.com/channel/0029Vb7LxhRGE56l9woRjd2g        
                  `;
                     
                 await zk.sendMessage(zk.user.id, { text: cmsg });
                 }
             }
             else if (connection == "close") {
-                const raisonDeconnexion = new boom_1.Boom(lastDisconnect?.error)?.output.statusCode;
-
-                const permanentErrors = new Set([
-                    baileys_1.DisconnectReason.loggedOut,
-                    baileys_1.DisconnectReason.badSession,
-                    baileys_1.DisconnectReason.forbidden,
-                    baileys_1.DisconnectReason.multideviceMismatch,
-                    401, 403, 405, 419, 440
-                ]);
-
-                if (permanentErrors.has(raisonDeconnexion)) {
-                    console.log(`❌ Permanent disconnect (${raisonDeconnexion}) - session invalid, not reconnecting.`);
-                    return;
+                let raisonDeconnexion = new boom_1.Boom(lastDisconnect?.error)?.output.statusCode;
+                if (raisonDeconnexion === baileys_1.DisconnectReason.badSession) {
+                    console.log('Session id error, rescan again...');
                 }
+                else if (raisonDeconnexion === baileys_1.DisconnectReason.connectionClosed) {
+                    console.log('!!! connexion fermée, reconnexion en cours ...');
+                    main();
+                }
+                else if (raisonDeconnexion === baileys_1.DisconnectReason.connectionLost) {
+                    console.log('connection error 😞 ,,, trying to reconnect... ');
+                    main();
+                }
+                else if (raisonDeconnexion === baileys_1.DisconnectReason?.connectionReplaced) {
+                    console.log('connexion réplacée ,,, une sesssion est déjà ouverte veuillez la fermer svp !!!');
+                }
+                else if (raisonDeconnexion === baileys_1.DisconnectReason.loggedOut) {
+                    console.log('vous êtes déconnecté,,, veuillez rescanner le code qr svp');
+                }
+                else if (raisonDeconnexion === baileys_1.DisconnectReason.restartRequired) {
+                    console.log('redémarrage en cours ▶️');
+                    main();
+                }   else {
 
-                console.log(`⚠️ Connection closed (${raisonDeconnexion}) - reconnecting...`);
-                setTimeout(() => main(), 5000);
+                    console.log('redemarrage sur le coup de l\'erreur  ',raisonDeconnexion) ;         
+                    //repondre("* Redémarrage du bot en cour ...*");
+
+                                const {exec}=require("child_process") ;
+
+                                exec("pm2 restart all");            
+                }
+                // sleep(50000)
+                console.log("hum " + connection);
+                main(); //console.log(session)
             }
         });
         //fin événement connexion
