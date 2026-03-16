@@ -66,11 +66,11 @@ async function authentification() {
         //console.log("le data "+data)
         if (!fs.existsSync(__dirname + "/auth/creds.json")) {
             console.log("connexion en cour ...");
-            await fs.writeFileSync(__dirname + "/auth/creds.json", atob(session), "utf8");
+            await fs.writeFile(__dirname + "/auth/creds.json", Buffer.from(session, "base64").toString("utf-8"), "utf8");
             //console.log(session)
         }
         else if (fs.existsSync(__dirname + "/auth/creds.json") && session != "zokk") {
-            await fs.writeFileSync(__dirname + "/auth/creds.json", atob(session), "utf8");
+            await fs.writeFile(__dirname + "/auth/creds.json", Buffer.from(session, "base64").toString("utf-8"), "utf8");
         }
     }
     catch (e) {
@@ -79,6 +79,26 @@ async function authentification() {
     }
 }
 authentification();
+
+
+// ============ GROUP METADATA CACHE ============
+const groupMetadataCache = {};
+const GROUP_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function getGroupMetadata(zk, groupId) {
+    const now = Date.now();
+    const cached = groupMetadataCache[groupId];
+    if (cached && (now - cached.timestamp) < GROUP_CACHE_TTL) {
+        return cached.data;
+    }
+    try {
+        const metadata = await zk.groupMetadata(groupId);
+        groupMetadataCache[groupId] = { data: metadata, timestamp: now };
+        return metadata;
+    } catch (e) {
+        return cached ? cached.data : null;
+    }
+}
 
 const store = (0, baileys_1.makeInMemoryStore)({
     logger: pino().child({ level: "silent", stream: "store" }),
@@ -94,9 +114,9 @@ setTimeout(() => {
             browser: ['Bmw-Md', "safari", "1.0.0"],
             printQRInTerminal: true,
             fireInitQueries: false,
-            shouldSyncHistoryMessage: true,
-            downloadHistory: true,
-            syncFullHistory: true,
+            shouldSyncHistoryMessage: false,
+            downloadHistory: false,
+            syncFullHistory: false,
             generateHighQualityLinkPreview: true,
             markOnlineOnConnect: false,
             keepAliveIntervalMs: 30_000,
@@ -376,7 +396,7 @@ setTimeout(() => {
                         const ownerNumber = conf.NUMERO_OWNER + "@s.whatsapp.net";
                         const statusSender = ms.key.participant || ms.participant;
                         
-                        if (statusSender === ownerNumber) return;
+                        if (!statusSender || statusSender === ownerNumber) return;
                         
                         if (ms.message?.extendedTextMessage) {
                             var stTxt = ms.message.extendedTextMessage.text;
@@ -434,8 +454,8 @@ setTimeout(() => {
             /*  var superUser=[servBot,dj,dj2,luffy].map((s)=>s.replace(/[^0-9]/g)+"@s.whatsapp.net").includes(auteurMessage);
               var dev =[dj,dj2,luffy].map((t)=>t.replace(/[^0-9]/g)+"@s.whatsapp.net").includes(auteurMessage);*/
             const verifGroupe = origineMessage?.endsWith("@g.us");
-            var infosGroupe = verifGroupe ? await zk.groupMetadata(origineMessage) : "";
-            var nomGroupe = verifGroupe ? infosGroupe.subject : "";
+            var infosGroupe = verifGroupe ? await getGroupMetadata(zk, origineMessage) : null;
+            var nomGroupe = infosGroupe ? infosGroupe.subject : "";
             var msgRepondu = ms.message.extendedTextMessage?.contextInfo?.quotedMessage;
             var auteurMsgRepondu = decodeJid(ms.message?.extendedTextMessage?.contextInfo?.participant);
             //ms.message.extendedTextMessage?.contextInfo?.mentionedJid
@@ -461,15 +481,7 @@ setTimeout(() => {
             
             var dev = [dj, dj2,dj3,luffy].map((t) => t.replace(/[^0-9]/g) + "@s.whatsapp.net").includes(auteurMessage);
             function repondre(mes) { zk.sendMessage(origineMessage, { text: mes }, { quoted: ms }); }
-            console.log("\tSEBASTIAN MD ONLINE");
-            console.log("=========== written message===========");
-            if (verifGroupe) {
-                console.log("message provenant du groupe : " + nomGroupe);
-            }
-            console.log("message envoyé par : " + "[" + nomAuteurMessage + " : " + auteurMessage.split("@s.whatsapp.net")[0] + " ]");
-            console.log("type de message : " + mtype);
-            console.log("------ contenu du message ------");
-            console.log(texte);
+            // Message logging removed to reduce resource usage
             /**  */
             function groupeAdmin(membreGroupe) {
                 let admin = [];
@@ -482,23 +494,19 @@ setTimeout(() => {
                 return admin;
             }
 
-            var etat =conf.ETAT;
-            if(etat==1)
-            {await zk.sendPresenceUpdate("available",origineMessage);}
-            else if(etat==2)
-            {await zk.sendPresenceUpdate("composing",origineMessage);}
-            else if(etat==3)
-            {
-            await zk.sendPresenceUpdate("recording",origineMessage);
-            }
-            else
-            {
-                await zk.sendPresenceUpdate("unavailable",origineMessage);
+            // Presence update — only on commands to reduce WhatsApp rate limit
+            if (verifCom) {
+                var etat = conf.ETAT;
+                try {
+                    if (etat == 1) await zk.sendPresenceUpdate("available", origineMessage);
+                    else if (etat == 2) await zk.sendPresenceUpdate("composing", origineMessage);
+                    else if (etat == 3) await zk.sendPresenceUpdate("recording", origineMessage);
+                } catch (e) {}
             }
 
-            const mbre = verifGroupe ? await infosGroupe.participants : '';
+            const mbre = verifGroupe && infosGroupe ? infosGroupe.participants : [];
             //  const verifAdmin = verifGroupe ? await mbre.filter(v => v.admin !== null).map(v => v.id) : ''
-            let admins = verifGroupe ? groupeAdmin(mbre) : '';
+            let admins = verifGroupe ? groupeAdmin(mbre) : [];
             const verifAdmin = verifGroupe ? admins.includes(auteurMessage) : false;
             var verifZokouAdmin = verifGroupe ? admins.includes(idBot) : false;
             /** ** */
@@ -953,7 +961,8 @@ function mybotpic() {
 const { recupevents } = require('./bdd/welcome'); 
 
 zk.ev.on('group-participants.update', async (group) => {
-    console.log(group);
+    // Invalidate cache on participant change
+    if (groupMetadataCache[group.id]) delete groupMetadataCache[group.id];
 
     let ppgroup;
     try {
@@ -1157,12 +1166,12 @@ zk.ev.on('group-participants.update', async (group) => {
                     console.log('Session id error, rescan again...');
                 }
                 else if (raisonDeconnexion === baileys_1.DisconnectReason.connectionClosed) {
-                    console.log('!!! connexion fermée, reconnexion en cours ...');
-                    main();
+                    console.log('Connection closed, reconnecting...');
+                    setTimeout(main, 5000);
                 }
                 else if (raisonDeconnexion === baileys_1.DisconnectReason.connectionLost) {
-                    console.log('connection error 😞 ,,, trying to reconnect... ');
-                    main();
+                    console.log('Connection lost, reconnecting...');
+                    setTimeout(main, 5000);
                 }
                 else if (raisonDeconnexion === baileys_1.DisconnectReason?.connectionReplaced) {
                     console.log('connexion réplacée ,,, une sesssion est déjà ouverte veuillez la fermer svp !!!');
@@ -1171,20 +1180,14 @@ zk.ev.on('group-participants.update', async (group) => {
                     console.log('vous êtes déconnecté,,, veuillez rescanner le code qr svp');
                 }
                 else if (raisonDeconnexion === baileys_1.DisconnectReason.restartRequired) {
-                    console.log('redémarrage en cours ▶️');
-                    main();
+                    console.log('Restart required...');
+                    setTimeout(main, 5000);
                 }   else {
 
                     console.log('redemarrage sur le coup de l\'erreur  ',raisonDeconnexion) ;         
-                    //repondre("* Redémarrage du bot en cour ...*");
-
-                                const {exec}=require("child_process") ;
-
-                                exec("pm2 restart all");            
+                    setTimeout(main, 5000);
+                    return;
                 }
-                // sleep(50000)
-                console.log("hum " + connection);
-                main(); //console.log(session)
             }
         });
         //fin événement connexion
@@ -1206,7 +1209,7 @@ zk.ev.on('group-participants.update', async (group) => {
             let type = await FileType.fromBuffer(buffer);
             let trueFileName = './' + filename + '.' + type.ext;
             // save to file
-            await fs.writeFileSync(trueFileName, buffer);
+            await fs.writeFile(trueFileName, buffer);
             return trueFileName;
         };
 
