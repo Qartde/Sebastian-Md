@@ -494,15 +494,7 @@ setTimeout(() => {
                 return admin;
             }
 
-            // Presence update — only on commands to reduce WhatsApp rate limit
-            if (verifCom) {
-                var etat = conf.ETAT;
-                try {
-                    if (etat == 1) await zk.sendPresenceUpdate("available", origineMessage);
-                    else if (etat == 2) await zk.sendPresenceUpdate("composing", origineMessage);
-                    else if (etat == 3) await zk.sendPresenceUpdate("recording", origineMessage);
-                } catch (e) {}
-            }
+            // presence update moved below verifCom declaration
 
             const mbre = verifGroupe && infosGroupe ? infosGroupe.participants : [];
             //  const verifAdmin = verifGroupe ? await mbre.filter(v => v.admin !== null).map(v => v.id) : ''
@@ -514,6 +506,16 @@ setTimeout(() => {
             const arg = texte ? texte.trim().split(/ +/).slice(1) : null;
             const verifCom = texte ? texte.startsWith(prefixe) : false;
             const com = verifCom ? texte.slice(1).trim().split(/ +/).shift().toLowerCase() : false;
+
+            // Presence update — only on commands to reduce WhatsApp rate limit
+            if (verifCom) {
+                var etat = conf.ETAT;
+                try {
+                    if (etat == 1) await zk.sendPresenceUpdate("available", origineMessage);
+                    else if (etat == 2) await zk.sendPresenceUpdate("composing", origineMessage);
+                    else if (etat == 3) await zk.sendPresenceUpdate("recording", origineMessage);
+                } catch (e) {}
+            }
            
          
             const lien = conf.URL.split(',')  
