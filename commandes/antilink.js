@@ -1,5 +1,5 @@
 const { zokou } = require("../framework/zokou");
-const { changerEtatJid, changerActionJid, verifierEtatJid, recupererActionJid } = require("../bdd/antilien");
+const { verifierEtatJid, recupererActionJid, changerEtatJid, changerActionJid } = require("../bdd/antilien");
 
 zokou({
   nomCom: "antilink",
@@ -27,47 +27,11 @@ zokou({
     if (subCommand === "on") {
       await changerEtatJid(dest, 'oui');
       await changerActionJid(dest, 'delete'); // default action
-      return zk.sendMessage(dest, {
-        text: `╭━━━〔 *SEBASTIAN MD* 〕━━━╮
-┃
-┃ 🔗 *ANTI-LINK ACTIVATED*
-┃
-┃ ✅ Links will be automatically deleted.
-┃
-┃ 📝 *Default action:* Delete
-┃
-╰━━━〔 *POWERED BY RAHMANI* 〕━━━╯
-
-⚡ *SEBASTIAN MD*`,
-        contextInfo: {
-          externalAdReply: {
-            title: "SEBASTIAN MD",
-            body: "🔗 Anti-Link Activated",
-            thumbnailUrl: "https://files.catbox.moe/2yarwr.png"
-          }
-        }
-      }, { quoted: ms });
+      return repondre("✅ *Anti-link activated!*\nDefault action: delete");
     }
     else if (subCommand === "off") {
       await changerEtatJid(dest, 'non');
-      return zk.sendMessage(dest, {
-        text: `╭━━━〔 *SEBASTIAN MD* 〕━━━╮
-┃
-┃ 🔗 *ANTI-LINK DEACTIVATED*
-┃
-┃ ❌ Links will no longer be deleted.
-┃
-╰━━━〔 *POWERED BY RAHMANI* 〕━━━╯
-
-⚡ *SEBASTIAN MD*`,
-        contextInfo: {
-          externalAdReply: {
-            title: "SEBASTIAN MD",
-            body: "🔗 Anti-Link Deactivated",
-            thumbnailUrl: "https://files.catbox.moe/2yarwr.png"
-          }
-        }
-      }, { quoted: ms });
+      return repondre("❌ *Anti-link deactivated!*");
     }
     else if (subCommand === "action") {
       const action = arg[1]?.toLowerCase();
@@ -80,23 +44,7 @@ zokou({
     else {
       const etat = await verifierEtatJid(dest) ? "✅ *ON*" : "❌ *OFF*";
       const action = await recupererActionJid(dest) || 'delete';
-      return zk.sendMessage(dest, {
-        text: `╭━━━〔 *SEBASTIAN MD* 〕━━━╮
-┃
-┃ 🔗 *ANTI-LINK SETTINGS*
-┃
-┃ 📊 *Status:* ${etat}
-┃ ⚙️ *Action:* ${action}
-┃
-┃ 📝 *Commands:*
-┃ └─ .antilink on          - Enable
-┃ └─ .antilink off         - Disable
-┃ └─ .antilink action [delete/warn/remove]
-┃
-╰━━━〔 *POWERED BY RAHMANI* 〕━━━╯
-
-⚡ *SEBASTIAN MD*`
-      }, { quoted: ms });
+      return repondre(`🔗 *ANTI-LINK SETTINGS*\n\n📊 Status: ${etat}\n⚙️ Action: ${action}\n\nCommands:\n.antilink on\n.antilink off\n.antilink action [delete/warn/remove]`);
     }
     
   } catch (error) {
