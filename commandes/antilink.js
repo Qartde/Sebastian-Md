@@ -1,112 +1,106 @@
-// commandes/antilinkCmd.js
+const { zokou } = require("../framework/zokou");
+const { changerEtatJid, changerActionJid, verifierEtatJid, recupererActionJid } = require("../bdd/antilien");
 
-const { modifierEtatJid, recupererActionJid, modifierActionJid, verifierEtatJid } = require("../bdd/antilien");
-const conf = require("../set");
+zokou({
+  nomCom: "antilink",
+  aliases: ["antilien", "antiurl"],
+  reaction: "🔗",
+  categorie: "Group"
+}, async (dest, zk, commandeOptions) => {
+  const { ms, repondre, arg, auteurMessage, idBot } = commandeOptions;
+  
+  if (!dest.endsWith("@g.us")) {
+    return repondre("❌ This command only works in groups.");
+  }
+  
+  try {
+    const groupMetadata = await zk.groupMetadata(dest);
+    const participants = groupMetadata.participants;
+    const isAdmin = participants.some(p => p.id === auteurMessage && (p.admin === 'admin' || p.admin === 'superadmin'));
+    
+    if (!isAdmin) {
+      return repondre("❌ Only group admins can use this command.");
+    }
+    
+    const subCommand = arg[0]?.toLowerCase();
+    
+    if (subCommand === "on") {
+      await changerEtatJid(dest, 'oui');
+      await changerActionJid(dest, 'delete'); // default action
+      return zk.sendMessage(dest, {
+        text: `╭━━━〔 *SEBASTIAN MD* 〕━━━╮
+┃
+┃ 🔗 *ANTI-LINK ACTIVATED*
+┃
+┃ ✅ Links will be automatically deleted.
+┃
+┃ 📝 *Default action:* Delete
+┃
+╰━━━〔 *POWERED BY RAHMANI* 〕━━━╯
 
-// Command: antilink on/off/status/action
-async function antilinkCommand(origineMessage, zk, commandeOptions) {
-    const { superUser, verifAdmin, arg, ms, repondre } = commandeOptions;
-    
-    // Check if it's a group
-    if (!origineMessage.endsWith("@g.us")) {
-        return repondre("❌ This command can only be used in groups!");
-    }
-    
-    // Check if user is admin or superuser
-    if (!verifAdmin && !superUser) {
-        return repondre("❌ Only group admins can use this command!");
-    }
-    
-    // Check if arguments provided
-    if (!arg || arg.length === 0) {
-        // Show current status
-        const etat = await verifierEtatJid(origineMessage);
-        const action = await recupererActionJid(origineMessage) || 'delete';
-        const status = etat ? "✅ ENABLED" : "❌ DISABLED";
-        
-        return repondre(`╭━━━ *『 ANTI-LINK STATUS 』* ━━━╮
-┃
-┃ 📌 *Group:* ${origineMessage.split('@')[0]}
-┃ 🔰 *Status:* ${status}
-┃ ⚙️ *Action:* ${action}
-┃
-┃ *Commands:*
-┃ • ${conf.PREFIXE}antilink on - Enable
-┃ • ${conf.PREFIXE}antilink off - Disable
-┃ • ${conf.PREFIXE}antilink action [delete|remove|warn]
-┃ • ${conf.PREFIXE}antilink status - Show status
-┃
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`);
-    }
-    
-    const subCommand = arg[0].toLowerCase();
-    
-    // Handle on/off
-    if (subCommand === 'on' || subCommand === 'off') {
-        const newEtat = subCommand === 'on';
-        await modifierEtatJid(origineMessage, newEtat);
-        
-        return repondre(`✅ *ANTI-LINK ${newEtat ? 'ENABLED' : 'DISABLED'}* 
-        
-Anti-link has been ${newEtat ? 'activated' : 'deactivated'} for this group.
-${newEtat ? 'All links will now be automatically moderated.' : 'Links are now allowed in this group.'}`);
-    }
-    
-    // Handle action
-    if (subCommand === 'action' && arg[1]) {
-        const action = arg[1].toLowerCase();
-        
-        if (!['delete', 'remove', 'warn'].includes(action)) {
-            return repondre("❌ Invalid action! Use: delete, remove, or warn");
+⚡ *SEBASTIAN MD*`,
+        contextInfo: {
+          externalAdReply: {
+            title: "SEBASTIAN MD",
+            body: "🔗 Anti-Link Activated",
+            thumbnailUrl: "https://files.catbox.moe/2yarwr.png"
+          }
         }
-        
-        await modifierActionJid(origineMessage, action);
-        
-        let actionDescription = '';
-        if (action === 'delete') actionDescription = '📝 Links will be deleted and user warned';
-        else if (action === 'remove') actionDescription = '🚫 Users will be removed from group';
-        else if (action === 'warn') actionDescription = '⚠️ Users will be warned and tracked';
-        
-        return repondre(`✅ *ANTI-LINK ACTION UPDATED*
-        
-New action: *${action.toUpperCase()}*
-${actionDescription}`);
+      }, { quoted: ms });
     }
-    
-    // Handle status
-    if (subCommand === 'status') {
-        const etat = await verifierEtatJid(origineMessage);
-        const action = await recupererActionJid(origineMessage) || 'delete';
-        const status = etat ? "✅ ENABLED" : "❌ DISABLED";
-        
-        return repondre(`╭━━━ *『 ANTI-LINK STATUS 』* ━━━╮
+    else if (subCommand === "off") {
+      await changerEtatJid(dest, 'non');
+      return zk.sendMessage(dest, {
+        text: `╭━━━〔 *SEBASTIAN MD* 〕━━━╮
 ┃
-┃ 📌 *Group:* ${origineMessage.split('@')[0]}
-┃ 🔰 *Status:* ${status}
+┃ 🔗 *ANTI-LINK DEACTIVATED*
+┃
+┃ ❌ Links will no longer be deleted.
+┃
+╰━━━〔 *POWERED BY RAHMANI* 〕━━━╯
+
+⚡ *SEBASTIAN MD*`,
+        contextInfo: {
+          externalAdReply: {
+            title: "SEBASTIAN MD",
+            body: "🔗 Anti-Link Deactivated",
+            thumbnailUrl: "https://files.catbox.moe/2yarwr.png"
+          }
+        }
+      }, { quoted: ms });
+    }
+    else if (subCommand === "action") {
+      const action = arg[1]?.toLowerCase();
+      if (!action || !['delete', 'warn', 'remove'].includes(action)) {
+        return repondre("❌ Please specify action: delete, warn, or remove\nExample: .antilink action delete");
+      }
+      await changerActionJid(dest, action);
+      return repondre(`✅ Anti-link action set to: *${action}*`);
+    }
+    else {
+      const etat = await verifierEtatJid(dest) ? "✅ *ON*" : "❌ *OFF*";
+      const action = await recupererActionJid(dest) || 'delete';
+      return zk.sendMessage(dest, {
+        text: `╭━━━〔 *SEBASTIAN MD* 〕━━━╮
+┃
+┃ 🔗 *ANTI-LINK SETTINGS*
+┃
+┃ 📊 *Status:* ${etat}
 ┃ ⚙️ *Action:* ${action}
 ┃
-╰━━━━━━━━━━━━━━━━━━━━━━━━━━╯`);
+┃ 📝 *Commands:*
+┃ └─ .antilink on          - Enable
+┃ └─ .antilink off         - Disable
+┃ └─ .antilink action [delete/warn/remove]
+┃
+╰━━━〔 *POWERED BY RAHMANI* 〕━━━╯
+
+⚡ *SEBASTIAN MD*`
+      }, { quoted: ms });
     }
     
-    // Help
-    return repondre(`❓ *ANTI-LINK COMMANDS*
-        
-• ${conf.PREFIXE}antilink on - Enable anti-link
-• ${conf.PREFIXE}antilink off - Disable anti-link
-• ${conf.PREFIXE}antilink action delete - Just delete links
-• ${conf.PREFIXE}antilink action remove - Delete and remove user
-• ${conf.PREFIXE}antilink action warn - Delete and warn user
-• ${conf.PREFIXE}antilink status - Check current settings`);
-}
-
-// Register the command
-const commandes = [{
-    nomCom: "antilink",
-    categorie: "ADMIN",
-    reaction: "🛡️"
-}];
-
-module.exports = {
-    commandes,
-    antilinkCommand
-};
+  } catch (error) {
+    console.error("Anti-link command error:", error);
+    repondre("❌ Error: " + error.message);
+  }
+});
