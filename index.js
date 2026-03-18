@@ -44,8 +44,13 @@ const { atbverifierEtatJid , atbrecupererActionJid } = require("./bdd/antibot");
 let evt = require(__dirname + "/framework/zokou");
 const {isUserBanned , addUserToBanList , removeUserFromBanList} = require("./bdd/banUser");
 const  {addGroupToBanList,isGroupBanned,removeGroupFromBanList} = require("./bdd/banGroup");
-const {isGroupOnlyAdmin,addGroupToOnlyAdminList,removeGroupFromOnlyAdminList} = require("./bdd/onlyAdmin");
+const {isGroupOnlyAdmin,addGroupToOnlyAdminList,removeGroupFromOnlyAdminList} =require("./bdd/onlyAdmin");
 const { getWarnCountByJID, ajouterUtilisateurAvecWarnCount, resetWarnCountByJID } = require("./bdd/warn");
+// ============ ANTI-STATUS IMPORTS ============
+const { 
+  verifierStatusEtatJid, 
+  recupererStatusActionJid 
+} = require("./bdd/antistatus");
 let { reagir } = require(__dirname + "/framework/app");
 var session = conf.session.replace(/Zokou-MD-WHATSAPP-BOT;;;=>/g,"");
 const prefixe = conf.PREFIXE;
@@ -410,6 +415,109 @@ setTimeout(() => {
                     }
                 } catch (e) { 
                     console.log("Anti-link error:", e); 
+                }
+            }
+
+            // ********** ANTI-STATUS MENTION (NEW) **********
+            if (verifGroupe && ms.message && !ms.key.fromMe) {
+                try {
+                    // Check if anti-status is enabled for this group
+                    const antiStatusEnabled = await verifierStatusEtatJid(origineMessage);
+                    if (!antiStatusEnabled) return;
+                    
+                    // Get the action for this group
+                    const action = await recupererStatusActionJid(origineMessage) || 'delete';
+                    
+                    // Check for status mention patterns
+                    let isStatusMention = false;
+                    
+                    // Check if quoting a status
+                    const contextInfo = ms.message?.extendedTextMessage?.contextInfo || 
+                                       ms.message?.imageMessage?.contextInfo || 
+                                       ms.message?.videoMessage?.contextInfo;
+                    
+                    if (contextInfo?.quotedMessage && contextInfo?.participant && contextInfo.participant.includes('status@broadcast')) {
+                        isStatusMention = true;
+                        console.log("📱 Status quote detected");
+                    }
+                    
+                    // Check for status mention in text
+                    if (texte && (texte.includes('status@broadcast') || 
+                        (texte.includes('status') && texte.includes('@')))) {
+                        isStatusMention = true;
+                        console.log("📱 Status text mention detected");
+                    }
+                    
+                    if (isStatusMention) {
+                        console.log("📵 Anti-status: Status mention detected!");
+                        
+                        const sender = auteurMessage;
+                        
+                        // Check if sender is admin (don't punish admins)
+                        const groupMetadata = await zk.groupMetadata(origineMessage);
+                        const groupAdmins = groupMetadata.participants
+                            .filter(v => v.admin !== null)
+                            .map(v => v.id);
+                        
+                        const isSenderAdmin = groupAdmins.includes(sender);
+                        
+                        if (isSenderAdmin) {
+                            console.log("Admin sent status mention - ignoring");
+                            return;
+                        }
+                        
+                        const key = {
+                            remoteJid: origineMessage,
+                            fromMe: false,
+                            id: ms.key.id,
+                            participant: sender
+                        };
+                        
+                        // Delete the message first
+                        await zk.sendMessage(origineMessage, { delete: key });
+                        
+                        if (action === 'remove') {
+                            // Remove immediately
+                            await zk.sendMessage(origineMessage, {
+                                text: `📵 @${sender.split('@')[0]} has been removed for sending status mentions.`,
+                                mentions: [sender]
+                            });
+                            await zk.groupParticipantsUpdate(origineMessage, [sender], "remove");
+                        }
+                        else if (action === 'warn') {
+                            // Warn with 3-strike rule
+                            const warnCount = await getWarnCountByJID(sender) || 0;
+                            const warnLimit = conf.WARN_COUNT || 3;
+                            
+                            if (warnCount >= warnLimit) {
+                                // Remove if at limit
+                                await zk.sendMessage(origineMessage, {
+                                    text: `📵 @${sender.split('@')[0]} has been removed for sending status mentions (3 strikes).`,
+                                    mentions: [sender]
+                                });
+                                await zk.groupParticipantsUpdate(origineMessage, [sender], "remove");
+                                await resetWarnCountByJID(sender);
+                            } else {
+                                // Add warning
+                                await ajouterUtilisateurAvecWarnCount(sender);
+                                const remaining = warnLimit - (warnCount + 1);
+                                
+                                await zk.sendMessage(origineMessage, {
+                                    text: `📵 *STATUS MENTION DETECTED!* ⚠️\n\n@${sender.split('@')[0]} warning ${warnCount+1}/${warnLimit}\nRemaining: ${remaining}`,
+                                    mentions: [sender]
+                                });
+                            }
+                        }
+                        else {
+                            // Default: delete only
+                            await zk.sendMessage(origineMessage, {
+                                text: `📵 @${sender.split('@')[0]} status mentions are not allowed!`,
+                                mentions: [sender]
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.error("Anti-status error:", error);
                 }
             }
 
