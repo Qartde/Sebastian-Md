@@ -55,6 +55,7 @@ const readmore = more.repeat(4001)
 // Global variables
 global.lastReactionTime = 0;
 global.deletedMessages = []; // Store deleted messages
+global.antitag = global.antitag || {}; // Anti-tag settings
 
 async function authentification() {
     try {
@@ -199,7 +200,7 @@ setTimeout(() => {
             const verifCom = texte ? texte.startsWith(prefixe) : false;
             const com = verifCom ? texte.slice(1).trim().split(/ +/).shift().toLowerCase() : false;
            
-            const lien = conf.URL.split(',')  
+            const lien = conf.URL.split(',');  
 
             function mybotpic() {
                 const indiceAleatoire = Math.floor(Math.random() * lien.length);
@@ -251,6 +252,66 @@ setTimeout(() => {
                 }
             } catch (storeError) {
                 console.log("Message store error:", storeError.message);
+            }
+
+            // ============ ANTI-TAG SECTION ============
+            if (verifGroupe && global.antitag[origineMessage] && global.antitag[origineMessage].enabled === true) {
+                try {
+                    // Don't delete bot's own messages
+                    if (!ms.key.fromMe) {
+                        const sender = auteurMessage;
+                        
+                        // Check if sender is admin (don't delete admin messages)
+                        const isSenderAdmin = admins.includes(sender);
+                        
+                        // Only delete non-admin messages
+                        if (!isSenderAdmin) {
+                            // Check if message contains any tag/mention
+                            let hasTag = false;
+                            
+                            // Check for mentions in extendedTextMessage
+                            if (ms.message?.extendedTextMessage?.contextInfo?.mentionedJid) {
+                                const mentioned = ms.message.extendedTextMessage.contextInfo.mentionedJid;
+                                if (mentioned && mentioned.length > 0) {
+                                    hasTag = true;
+                                }
+                            }
+                            
+                            // Check for quoted/replied message
+                            if (ms.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
+                                hasTag = true;
+                            }
+                            
+                            // Check for @ symbol in text (simple tag)
+                            if (texte && texte.includes('@')) {
+                                hasTag = true;
+                            }
+                            
+                            // If message contains a tag, delete it
+                            if (hasTag) {
+                                console.log(`🚫 Anti-tag: Deleting message from ${sender} in ${origineMessage}`);
+                                
+                                // Delete the message
+                                await zk.sendMessage(origineMessage, {
+                                    delete: {
+                                        remoteJid: origineMessage,
+                                        fromMe: false,
+                                        id: ms.key.id,
+                                        participant: sender
+                                    }
+                                });
+                                
+                                // Send warning to user
+                                await zk.sendMessage(origineMessage, {
+                                    text: `@${sender.split('@')[0]} 🚫 *Don't tag members!*`,
+                                    mentions: [sender]
+                                });
+                            }
+                        }
+                    }
+                } catch (antitagError) {
+                    console.error("Anti-tag error:", antitagError);
+                }
             }
 
             // ============ ENHANCED ANTI-DELETE MESSAGE ============
