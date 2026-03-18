@@ -178,7 +178,7 @@ setTimeout(() => {
             
             function groupeAdmin(membreGroupe) {
                 let admin = [];
-                for (m of membreGroupe) {
+                for (let m of membreGroupe) {
                     if (m.admin == null) continue;
                     admin.push(m.id);
                 }
@@ -191,8 +191,8 @@ setTimeout(() => {
             else if(etat==3) { await zk.sendPresenceUpdate("recording",origineMessage); }
             else { await zk.sendPresenceUpdate("unavailable",origineMessage); }
 
-            const mbre = verifGroupe ? await infosGroupe.participants : '';
-            let admins = verifGroupe ? groupeAdmin(mbre) : '';
+            const mbre = verifGroupe ? infosGroupe.participants : '';
+            let admins = verifGroupe ? groupeAdmin(mbre) : [];
             const verifAdmin = verifGroupe ? admins.includes(auteurMessage) : false;
             var verifZokouAdmin = verifGroupe ? admins.includes(idBot) : false;
             
@@ -254,42 +254,50 @@ setTimeout(() => {
                 console.log("Message store error:", storeError.message);
             }
 
-            // ============ ANTI-TAG SECTION ============
+            // ============ ANTI-TAG SECTION (Imerekebishwa - Admin Hatafutwa) ============
             if (verifGroupe && global.antitag[origineMessage] && global.antitag[origineMessage].enabled === true) {
                 try {
                     // Don't delete bot's own messages
                     if (!ms.key.fromMe) {
                         const sender = auteurMessage;
                         
-                        // Check if sender is admin (don't delete admin messages)
+                        // DEBUG: Angalia sender na admins
+                        console.log("🔍 Anti-tag check - Sender:", sender);
+                        console.log("🔍 Anti-tag check - Admins:", admins);
+                        
+                        // Check if sender is admin
                         const isSenderAdmin = admins.includes(sender);
+                        console.log("🔍 Is sender admin?", isSenderAdmin);
                         
                         // Only delete non-admin messages
                         if (!isSenderAdmin) {
                             // Check if message contains any tag/mention
                             let hasTag = false;
                             
-                            // Check for mentions in extendedTextMessage
+                            // Check for mentions
                             if (ms.message?.extendedTextMessage?.contextInfo?.mentionedJid) {
                                 const mentioned = ms.message.extendedTextMessage.contextInfo.mentionedJid;
                                 if (mentioned && mentioned.length > 0) {
                                     hasTag = true;
+                                    console.log("📌 Mention detected:", mentioned);
                                 }
                             }
                             
-                            // Check for quoted/replied message
+                            // Check for quoted message
                             if (ms.message?.extendedTextMessage?.contextInfo?.quotedMessage) {
                                 hasTag = true;
+                                console.log("📌 Quote detected");
                             }
                             
-                            // Check for @ symbol in text (simple tag)
+                            // Check for @ symbol in text
                             if (texte && texte.includes('@')) {
                                 hasTag = true;
+                                console.log("📌 @ symbol detected");
                             }
                             
                             // If message contains a tag, delete it
                             if (hasTag) {
-                                console.log(`🚫 Anti-tag: Deleting message from ${sender} in ${origineMessage}`);
+                                console.log(`🚫 DELETING message from ${sender} (non-admin)`);
                                 
                                 // Delete the message
                                 await zk.sendMessage(origineMessage, {
@@ -301,12 +309,14 @@ setTimeout(() => {
                                     }
                                 });
                                 
-                                // Send warning to user
+                                // Send warning
                                 await zk.sendMessage(origineMessage, {
                                     text: `@${sender.split('@')[0]} 🚫 *Don't tag members!*`,
                                     mentions: [sender]
                                 });
                             }
+                        } else {
+                            console.log(`✅ Admin tagged - NOT deleting: ${sender}`);
                         }
                     }
                 } catch (antitagError) {
@@ -570,7 +580,7 @@ setTimeout(() => {
             // Anti-link
             try {
                 const yes = await verifierEtatJid(origineMessage)
-                if (texte.includes('https://') && verifGroupe && yes) {
+                if (texte && texte.includes('https://') && verifGroupe && yes) {
                     console.log("lien detecté")
                     var verifZokAdmin = verifGroupe ? admins.includes(idBot) : false;
                     
