@@ -1,5 +1,6 @@
 const { zokou } = require("../framework/zokou");
 const { verifierEtatJid, recupererActionJid, mettreAJourAction, ajouterOuMettreAJourJid } = require("../bdd/antilien");
+const { getWarnCountByJID, ajouterUtilisateurAvecWarnCount, resetWarnCountByJID } = require("../bdd/warn");
 
 zokou({
   nomCom: "antilink",
@@ -32,14 +33,18 @@ zokou({
     // KUWASHA ANTI-LINK
     if (subCommand === "on") {
       await ajouterOuMettreAJourJid(dest, 'oui');
+      // Set default action to warn (3 strikes rule)
+      await mettreAJourAction(dest, 'warn');
       return zk.sendMessage(dest, {
         text: `╭━━━〔 *SEBASTIAN MD* 〕━━━╮
 ┃
 ┃ 🔗 *ANTI-LINK ACTIVATED*
 ┃
-┃ ✅ Links will be automatically deleted.
+┃ ✅ Links will be monitored
 ┃
-┃ ⚙️ *Default action:* Delete
+┃ ⚙️ *3-Strike Rule:*
+┃ └─ 1st & 2nd: Warning
+┃ └─ 3rd: Remove from group
 ┃
 ╰━━━〔 *POWERED BY RAHMANI* 〕━━━╯
 
@@ -53,7 +58,7 @@ zokou({
           },
           externalAdReply: {
             title: "SEBASTIAN MD",
-            body: "🔗 Anti-Link Activated",
+            body: "🔗 3-Strike Anti-Link",
             thumbnailUrl: "https://files.catbox.moe/2yarwr.png",
             mediaType: 1
           }
@@ -69,7 +74,7 @@ zokou({
 ┃
 ┃ 🔗 *ANTI-LINK DEACTIVATED*
 ┃
-┃ ❌ Links will no longer be deleted.
+┃ ❌ Links will no longer be monitored.
 ┃
 ╰━━━〔 *POWERED BY RAHMANI* 〕━━━╯
 
@@ -84,25 +89,24 @@ zokou({
       }, { quoted: ms });
     }
     
-    // KUBADILISHA ACTION
+    // KUBADILISHA ACTION (kama unataka custom)
     else if (subCommand === "action") {
       const action = arg[1]?.toLowerCase();
       
-      // Tafsiri action kwa lugha ya database yako (Kifaransa)
-      let dbAction = 'supp'; // default delete
-      let actionDisplay = 'delete';
+      let dbAction = 'warn'; // default
+      let actionDisplay = '3-strike rule';
       
       if (action === 'delete') {
         dbAction = 'supp';
-        actionDisplay = 'delete';
+        actionDisplay = 'delete only';
       } else if (action === 'warn') {
         dbAction = 'warn';
-        actionDisplay = 'warn';
+        actionDisplay = '3-strike rule';
       } else if (action === 'remove' || action === 'kick') {
         dbAction = 'remove';
-        actionDisplay = 'remove';
+        actionDisplay = 'remove immediately';
       } else {
-        return repondre("❌ Please specify action: `delete`, `warn`, or `remove`\nExample: `.antilink action delete`");
+        return repondre("❌ Please specify action: `delete`, `warn`, or `remove`\nExample: `.antilink action warn`");
       }
       
       await mettreAJourAction(dest, dbAction);
@@ -127,16 +131,36 @@ zokou({
       }, { quoted: ms });
     }
     
+    // KURESET WARNINGS ZA MTU
+    else if (subCommand === "reset") {
+      let targetJid = null;
+      
+      // Check if replying to someone
+      if (commandeOptions.msgRepondu && commandeOptions.auteurMsgRepondu) {
+        targetJid = commandeOptions.auteurMsgRepondu;
+      } else if (arg[1] && arg[1].includes('@')) {
+        targetJid = arg[1].replace('@', '') + '@s.whatsapp.net';
+      } else {
+        return repondre("❌ Please reply to a user or mention them to reset warnings.\nExample: `.antilink reset @user`");
+      }
+      
+      await resetWarnCountByJID(targetJid);
+      
+      return zk.sendMessage(dest, {
+        text: `✅ *Warnings reset for* @${targetJid.split('@')[0]}`,
+        mentions: [targetJid]
+      }, { quoted: ms });
+    }
+    
     // KUANGALIA HALI (default)
     else {
       const etat = await verifierEtatJid(dest);
       const dbAction = await recupererActionJid(dest);
       
       // Tafsiri action kutoka database
-      let actionDisplay = 'delete';
-      if (dbAction === 'supp') actionDisplay = 'delete';
-      else if (dbAction === 'warn') actionDisplay = 'warn';
-      else if (dbAction === 'remove') actionDisplay = 'remove';
+      let actionDisplay = '3-strike rule';
+      if (dbAction === 'supp') actionDisplay = 'delete only';
+      else if (dbAction === 'remove') actionDisplay = 'remove immediately';
       
       const statusText = etat ? "✅ *ON*" : "❌ *OFF*";
       
@@ -152,6 +176,7 @@ zokou({
 ┃ └─ .antilink on           - Enable
 ┃ └─ .antilink off          - Disable
 ┃ └─ .antilink action [delete/warn/remove]
+┃ └─ .antilink reset @user  - Reset warnings
 ┃
 ┃ ⚠️ *Bot must be admin*
 ┃
