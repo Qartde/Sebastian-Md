@@ -9,7 +9,7 @@ zokou({
   reaction: "🚫",
   categorie: "Group"
 }, async (dest, zk, commandeOptions) => {
-  const { ms, repondre, arg, auteurMessage } = commandeOptions;
+  const { ms, repondre, arg, auteurMessage, idBot } = commandeOptions;
   
   // Only group chats
   if (!dest.endsWith("@g.us")) {
@@ -21,7 +21,7 @@ zokou({
     const groupMetadata = await zk.groupMetadata(dest);
     const participants = groupMetadata.participants;
     const isAdmin = participants.some(p => p.id === auteurMessage && (p.admin === 'admin' || p.admin === 'superadmin'));
-    const isBotAdmin = participants.some(p => p.id === zk.user.id && (p.admin === 'admin' || p.admin === 'superadmin'));
+    const isBotAdmin = participants.some(p => p.id === idBot && (p.admin === 'admin' || p.admin === 'superadmin'));
     
     if (!isAdmin) {
       return repondre("❌ Only group admins can use this command.");
